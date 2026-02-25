@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>图文排版记事本 V15 - 沉浸预览版</title>
+    <!-- 引入基础库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400;700&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@300;400;700;900&family=Noto+Serif+SC:wght@300;400;700;900&family=Pacifico&family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;700&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked-katex-extension/lib/index.umd.js"></script>
+
+    <style>
+        :root {
+            --page-width: 900px;
+            --page-height: 1200px;
+            --page-bg-color: #ffffff;
+            
+            /* 全局排版变量 */
+            --font-main: 'Noto Sans SC', sans-serif;
+            --base-font-size: 22px;
+            --base-line-height: 1.8;
+            
+            /* 主题色变量 */
+            --theme-color: #ff4d4f; 
+            --highlight-color: rgba(255, 77, 79, 0.2);
+            --font-serif: 'Noto Serif SC', serif;
+            --font-sans: 'Noto Sans SC', sans-serif;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f5f5f7; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* 顶部极简工具栏 */
+        .header { background: #ffffff; padding: 12px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; z-index: 10; flex-shrink: 0;}
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .header h1 { margin: 0; font-size: 18px; color: #333; font-weight: 600; display: flex; align-items: center; gap: 8px;}
+        .header h1 span { font-size: 11px; background: #0ea5e9; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; letter-spacing: 1px;}
+        
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .export-btn { padding: 0 18px; background: linear-gradient(135deg, #007aff, #005bb5); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; transition: opacity 0.2s, transform 0.1s; height: 34px; line-height: 34px; white-space: nowrap;}
+        .export-btn:active { transform: scale(0.96); }
+        .export-btn:disabled { background: #a1cbf5; cursor: not-allowed; }
+        .avatar { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #eaeaea; background-color: #e0f7fa; background-image: url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix&style=circle'); background-size: cover;}
+
+        /* 主体工作区 */
+        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        
+        /* 左侧输入区：彻底变纯粹 */
+        .editor-panel { width: 40%; min-width: 380px; background: #ffffff; border-right: 1px solid #e5e5ea; padding: 20px; display: flex; flex-direction: column; position: relative;}
+        
+        /* 编辑器增强工具栏 */
+        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0;}
+        .editor-header .title { font-size: 15px; color: #333; font-weight: bold; display: flex; align-items: center; gap: 6px;}
+        .file-actions { display: flex; gap: 6px; }
+        .file-actions button { background: #f2f2f7; border: 1px solid #d1d1d6; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .file-actions button:active { background: #e5e5ea; }
+        
+        .md-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #e5e5ea; flex-shrink: 0;}
+        .md-toolbar button { background: #fff; border: 1px solid #d1d1d6; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; cursor: pointer; color: #444; display: flex; align-items: center; gap: 4px; transition: 0.1s;}
+        .md-toolbar button:active { background: #eef2ff; border-color: #a5b4fc; color: #4338ca; }
+        .md-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; background: #f5f5f5; color: #aaa; border-color: #eee; }
+        .md-toolbar .divider { width: 1px; background: #d1d1d6; margin: 0 4px; }
+        
+        textarea { flex: 1; width: 100%; resize: none; border: 1px solid #d1d1d6; border-radius: 8px; padding: 16px; font-size: 15px; line-height: 1.6; outline: none; background: #fafafa; transition: border 0.3s; font-family: monospace; }
+        textarea:focus { border-color: #0ea5e9; background: #ffffff; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
+        .save-hint { position: absolute; bottom: 30px; right: 35px; font-size: 12px; color: #10b981; opacity: 0; transition: opacity 0.5s; pointer-events: none;}
+
+        /* ★ 右侧预览区：排版控制台移至此处 ★ */
+        .preview-panel { width: 60%; overflow-y: auto; background: #ebebf0; position: relative; display: flex; flex-direction: column; }
+        
+        /* 预览区顶部设置栏：电脑端网格，移动端横滑 */
+        .settings-bar {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px);
+            padding: 12px 20px; border-bottom: 1px solid #e5e5ea;
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+
+        .settings-bar select, .settings-bar input[type="text"] {
+            height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #d1d1d6;
+            font-size: 13px; background: #fff; outline: none; transition: 0.2s;
+        }
+        .settings-bar select:hover, .settings-bar input[type="text"]:focus { border-color: #0ea5e9; }
+        .settings-bar input[type="color"] { height: 32px; width: 36px; padding: 2px 4px; border-radius: 6px; border: 1px solid #d1d1d6; background: #fff; cursor: pointer; }
+        
+        .setting-item { display: flex; align-items: center; background: #fff; border: 1px solid #d1d1d6; border-radius: 6px; height: 32px; padding: 0 8px; gap: 6px; }
+        .setting-item span { font-size: 12px; color: #666; font-weight: bold; }
+        .setting-item input[type="range"] { width: 65px; accent-color: #0ea5e9; cursor: pointer;}
+        
+        .switch-label { display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: bold; color: #0ea5e9; background: #e0f2fe; padding: 0 10px; height: 32px; border-radius: 6px; border: 1px solid #bae6fd; transition: 0.2s;}
+        .switch-label input { margin-right: 6px; width: 14px; height: 14px; accent-color: #0ea5e9; }
+
+        .preview-content { padding: 30px; flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .scale-wrapper { transform-origin: top center; transition: transform 0.3s ease; display: flex; flex-direction: column; align-items: center; gap: 40px; padding-bottom: 60px; }
+        
+        /* 页面容器 */
+        .page { width: var(--page-width); height: var(--page-height); background-color: var(--page-bg-color); box-shadow: 0 12px 32px rgba(0,0,0,0.12); padding: 60px 70px 90px 70px; position: relative; transition: width 0.3s, height 0.3s, background-color 0.3s; overflow: hidden; flex-shrink: 0; font-family: var(--font-main); }
+        .page-footer { position: absolute; bottom: 30px; left: 70px; right: 70px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 15px; }
+        .page-footer .watermark { font-size: 15px; color: rgba(0,0,0,0.4); font-weight: bold; letter-spacing: 1px; }
+        .page-footer .page-indicator { font-size: 14px; color: rgba(0,0,0,0.3); font-family: Arial, sans-serif; font-weight: bold; }
+
+        /* 封面模式 */
+        .page.page-cover { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-top: 40px; padding-bottom: 40px; }
+        .page.page-cover .page-content { width: 100%; }
+        .page.page-cover .page-content h1 { font-size: 68px !important; line-height: 1.2; margin-top: 0; margin-bottom: 20px !important; border-bottom: none !important; padding-bottom: 0; display: block !important; text-align: center !important; background: none !important; box-shadow: none !important; color: inherit; }
+        .page.page-cover .page-content h2 { font-size: 32px !important; color: rgba(0,0,0,0.6) !important; border: none !important; padding: 0 !important; margin-top: 10px !important; margin-bottom: 40px !important; background: none !important; text-align: center !important; display: block !important; }
+        .page.page-cover .page-content h2::before { display: none !important; }
+        .page.page-cover .page-content p { text-align: center !important; font-size: 24px;}
+        .page.page-cover .page-content img { max-height: 550px; width: auto; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.15) !important; margin: 40px auto !important; display: block; }
+        .page.page-cover .page-footer { display: none !important; }
+
+        /* 排版样式库 */
+        .page-content { font-size: var(--base-font-size); line-height: var(--base-line-height); word-wrap: break-word; word-break: break-all; } 
+        .page-content p { margin-bottom: 24px; text-align: justify; letter-spacing: 0.5px; }
+        .page-content img { max-width: 100%; max-height: 950px; width: auto; height: auto; border-radius: 12px; display: block; margin: 35px auto; box-shadow: 0 4px 16px rgba(0,0,0,0.06); object-fit: contain; }
+        
+        .page-content blockquote.notice-box { background: linear-gradient(135deg, #fef3c7 0%, #fefce8 100%) !important; border-left: 8px solid #f59e0b !important; border-radius: 8px 16px 16px 8px !important; padding: 20px 25px !important; margin: 30px 0 !important; color: #b45309 !important; font-weight: bold !important; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15) !important; position: relative; font-style: normal !important; }
+        .page-content blockquote.notice-box::before { content: '💡'; font-size: 26px; margin-right: 12px; vertical-align: top; display: inline-block; }
+        .page-content blockquote.notice-box p { margin-bottom: 0; display: inline; color: #92400e !important; }
+
+        .page-content ul.contains-task-list { list-style: none; padding-left: 0; margin-top: 25px; }
+        .page-content ul.contains-task-list li { display: flex; align-items: flex-start; margin-bottom: 16px; background: #f8f9fa; padding: 15px 20px; border-radius: 12px; border: 2px dashed #d1d1d6; font-weight: bold; color: #444; font-size: 20px; }
+        .page-content input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 26px; height: 26px; border: 2px solid #007aff; border-radius: 6px; margin-right: 15px; margin-top: 2px; position: relative; flex-shrink: 0; background: #fff; cursor: pointer; outline: none; }
+        .page-content input[type="checkbox"]:checked { background-color: #10b981; border-color: #10b981; }
+        .page-content input[type="checkbox"]:checked::after { content: '✓'; color: white; position: absolute; font-size: 18px; font-weight: bold; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        .page-content ul.contains-task-list li:has(input[type="checkbox"]:checked) { color: #a1a1aa; text-decoration: line-through; background: #fcfcfc; border-color: #ebebeb; }
+
+        .page-content table { width: 100%; border-collapse: collapse; margin: 25px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px #e5e5ea; font-size: 18px; }
+        .page-content th, .page-content td { padding: 14px 18px; text-align: left; border-bottom: 1px solid #e5e5ea; }
+        .page-content th { background-color: #f8f9fa; font-weight: 900; color: #333; }
+        .page-content tr:nth-child(even) { background-color: #fafafa; }
+        
+        .page-content pre { background: #282c34; color: #abb2bf; padding: 40px 20px 20px; border-radius: 12px; overflow-x: auto; font-size: 16px; margin: 25px 0; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-family: 'Courier New', Courier, monospace; }
+        .page-content pre::before { content: ''; position: absolute; top: 15px; left: 15px; width: 12px; height: 12px; border-radius: 50%; background: #fc625d; box-shadow: 20px 0 #fdbc40, 40px 0 #35cd4b; }
+        .page-content p > code, .page-content li > code, .page-content table code { background: #f2f2f7; color: #ec4899; padding: 4px 8px; border-radius: 6px; font-size: 0.9em; border: 1px solid #e5e5ea; font-weight: bold; }
+
+        /* 列表样式分发 */
+        .page-content ul { padding-left: 10px; margin-bottom: 24px; list-style: none; }
+        .page-content ul li { margin-bottom: 12px; position: relative; padding-left: 28px; }
+        .page-content ul li::before { position: absolute; left: 0; color: var(--theme-color); font-weight: bold; text-align: center; width: 20px; }
+        [data-list-style="default"] .page-content ul li::before { content: ''; top: 10px; left: 4px; width: 8px; height: 8px; border-radius: 50%; background-color: var(--theme-color); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--highlight-color); }
+        [data-list-style="circle"] .page-content ul li::before { content: ''; top: 9px; left: 4px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--theme-color); background: #fff; }
+        [data-list-style="square"] .page-content ul li::before { content: ''; top: 11px; left: 6px; width: 8px; height: 8px; background-color: var(--theme-color); }
+        [data-list-style="arrow"] .page-content ul li::before { content: '➤'; font-size: 16px; top: -1px; }
+        [data-list-style="star"] .page-content ul li::before { content: '★'; font-size: 16px; top: -1px; }
+        [data-list-style="emoji"] .page-content ul li::before { content: '🌈'; font-size: 16px; top: -1px; }
+
+        .page-content ol { padding-left: 20px; margin-bottom: 24px; }
+        .page-content ol li { margin-bottom: 12px; padding-left: 8px; font-weight: bold; color: #555; }
+        [data-list-style] .page-content ol { list-style-type: decimal; }
+        [data-list-style] .page-content ol li::marker { color: var(--theme-color); font-weight: 900; }
+        [data-list-style="zero"] .page-content ol { list-style-type: decimal-leading-zero; }
+        [data-list-style="alpha"] .page-content ol { list-style-type: upper-alpha; }
+        [data-list-style="roman"] .page-content ol { list-style-type: upper-roman; }
+        [data-list-style="circled"] .page-content ol { list-style: none; counter-reset: circle-counter; padding-left: 5px; }
+        [data-list-style="circled"] .page-content ol li { counter-increment: circle-counter; padding-left: 30px; position: relative; }
+        [data-list-style="circled"] .page-content ol li::before { content: counter(circle-counter); position: absolute; left: 0; top: 2px; width: 24px; height: 24px; border-radius: 50%; background-color: var(--theme-color); color: #fff; text-align: center; line-height: 24px; font-size: 14px; }
+
+        /* 主题颜色 */
+        .theme-default { --theme-color: #ff4d4f; --highlight-color: rgba(255, 77, 79, 0.2); }
+        .theme-default .page-content h1 { font-size: 46px; color: #000; margin-top: 0; margin-bottom: 40px; font-weight: 900; border-bottom: 4px solid var(--theme-color); padding-bottom: 12px; display: inline-block;}
+        .theme-default .page-content h2 { font-size: 34px; color: #1a1a1a; margin-top: 45px; margin-bottom: 25px; font-weight: 700; position: relative; padding-left: 18px;}
+        .theme-default .page-content h2::before { content: ''; position: absolute; left: 0; top: 10%; height: 80%; width: 6px; background-color: var(--theme-color); border-radius: 3px; }
+        .theme-default .page-content strong { color: #000; font-weight: 900; background: linear-gradient(transparent 60%, rgba(255, 77, 79, 0.3) 60%); padding: 0 4px; border-radius: 0; }
+        .theme-default .page-content blockquote { border-left: 5px solid #d1d1d6; margin: 30px 0; padding: 15px 25px; background: rgba(0,0,0,0.03); border-radius: 0 8px 8px 0; color: #666; font-style: italic;}
+
+        .theme-minimal { --theme-color: #000000; --highlight-color: rgba(0,0,0,0.1); }
+        .theme-minimal .page-content h1 { font-size: 44px; color: #000; text-align: center; margin-top: 0; margin-bottom: 50px; font-weight: 700; border-bottom: 1px solid #000; padding-bottom: 20px; display: block; letter-spacing: 2px;}
+        .theme-minimal .page-content h2 { font-size: 30px; color: #000; margin-top: 40px; margin-bottom: 25px; font-weight: 700; border-left: 3px solid #000; padding-left: 15px;}
+        .theme-minimal .page-content strong { color: #000; font-weight: 900; background: none; border-bottom: 2px solid #000; padding: 0; }
+        .theme-minimal .page-content blockquote { border-left: 1px solid #000; margin: 30px 40px; padding: 0 20px; color: #555; font-style: italic;}
+        .theme-minimal .page-content img { border-radius: 0; box-shadow: none; border: 1px solid #eee; }
+
+        .theme-academic { --theme-color: #003366; --highlight-color: rgba(0, 51, 102, 0.15); }
+        .theme-academic .page-content { line-height: 2; text-align: justify;}
+        .theme-academic .page-content h1 { font-size: 40px; text-align: center; margin-top: 0; margin-bottom: 40px; font-weight: 900; color: var(--theme-color);}
+        .theme-academic .page-content h2 { font-size: 28px; border-bottom: 2px solid var(--theme-color); padding-bottom: 8px; margin-top: 40px; margin-bottom: 20px; font-weight: 900; color: var(--theme-color);}
+        .theme-academic .page-content strong { font-weight: 900; color: #000; background: #e6f0ff; padding: 0 4px;}
+        .theme-academic .page-content blockquote { margin: 20px 40px; padding: 0; color: #333; border-left: 4px solid var(--theme-color); padding-left: 15px;}
+        
+        .theme-cute { --theme-color: #ffb6b9; --highlight-color: #fae3d9; }
+        .theme-cute .page-content h1 { font-size: 42px; background: #ffb6b9; color: #fff; border-radius: 20px; padding: 12px 28px; margin-top: 0; margin-bottom: 40px; display: inline-block; box-shadow: 0 6px 16px rgba(255, 182, 185, 0.4);}
+        .theme-cute .page-content h2 { font-size: 30px; background: #fae3d9; padding: 6px 20px; border-radius: 15px; display: inline-block; color: #e08f62; margin-top: 40px; margin-bottom: 20px;}
+        .theme-cute .page-content strong { color: #ff7b54; font-weight: 900; background: linear-gradient(transparent 60%, #ffe9a6 40%); padding: 0 4px; }
+        .theme-cute .page-content blockquote { background: #fdf6f0; border-left: 6px solid #ffb6b9; margin: 30px 0; padding: 15px 25px; border-radius: 12px; color: #8c7a80;}
+
+        /* ============================================== */
+        /* ★ 核心升级：移动端完美适配 (Media Queries) ★ */
+        /* ============================================== */
+        
+        /* 底部导航栏 (默认隐藏) */
+        .bottom-nav { display: none; }
+
+        @media (max-width: 900px) {
+            /* 1. 布局改为独占模式 */
+            .main-container { flex-direction: column; }
+            .editor-panel, .preview-panel { width: 100%; min-width: 0; height: 100%; padding: 12px; border-right: none; }
+            
+            /* 默认状态下隐藏预览面板 */
+            .preview-panel { display: none; padding: 0; padding-bottom: 60px;} 
+            
+            /* 控制显示的辅助类 */
+            .show-preview .preview-panel { display: flex; } 
+            .show-preview .editor-panel { display: none; }
+            
+            /* 2. 头部瘦身 */
+            .header { padding: 10px; gap: 8px; }
+            .header-left h1 { font-size: 16px; }
+            .export-btn { font-size: 12px; padding: 0 12px; height: 30px; line-height: 30px; }
+            
+            /* 3. ★ 移动端：排版设置栏变为顶部横向滑动条 ★ */
+            .settings-bar {
+                padding: 10px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
+                -webkit-overflow-scrolling: touch; border-radius: 0; margin: 0; box-shadow: none; border-bottom: 1px solid #e5e5ea;
+            }
+            .settings-bar::-webkit-scrollbar { display: none; }
+            .settings-bar > * { flex-shrink: 0; }
+            
+            .preview-content { padding: 15px; padding-bottom: 80px;}
+
+            /* 4. 隐藏编辑区标题 */
+            .editor-header .title { display: none; }
+            .editor-header { justify-content: flex-end; margin-bottom: 8px;}
+
+            /* 5. 工具栏横向滑动 */
+            .md-toolbar { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+            .md-toolbar::-webkit-scrollbar { display: none; } 
+            .md-toolbar button { flex-shrink: 0; padding: 6px 10px; font-size: 12px;}
+            
+            /* 6. 底部导航栏激活 */
+            body { padding-bottom: 56px; } 
+            .bottom-nav {
+                display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+                height: 56px; background: #fff; border-top: 1px solid #e5e5ea;
+                z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+                justify-content: space-around; align-items: center;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            .nav-item {
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                width: 50%; height: 100%; color: #9ca3af; font-size: 12px; font-weight: 500; cursor: pointer;
+            }
+            .nav-item svg { width: 22px; height: 22px; margin-bottom: 2px; fill: currentColor; }
+            .nav-item.active { color: #0ea5e9; font-weight: bold; background: #f0f9ff; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-left">
+            <h1>排版记事本 <span>V15 沉浸预览</span></h1>
+        </div>
+        <div class="header-right">
+            <button id="export-btn" class="export-btn" onclick="exportImages()">保存大图</button>
+            <div class="avatar" title="创作者"></div>
+        </div>
+    </div>
+
+    <div class="main-container" id="main-container">
+        
+        <!-- 左侧输入区：纯粹的编辑环境 -->
+        <div class="editor-panel">
+            <!-- 操作按钮 -->
+            <div class="editor-header">
+                <span class="title">✏️ 纯净写作模式</span>
+                <div class="file-actions">
+                    <input type="file" id="file-upload" accept="image/*" multiple style="display: none;">
+                    <button id="btn-clear" style="color:#d32f2f;" title="清空内容">🗑️ 清空</button>
+                    <button id="btn-restore" style="color:#007aff; display:none;" title="恢复">↩️ 恢复</button>
+                </div>
+            </div>
+
+            <!-- Markdown 可视化操作栏 -->
+            <div class="md-toolbar">
+                <button onclick="undo()" id="btn-undo" title="撤销 (Ctrl+Z)" disabled>↶</button>
+                <button onclick="redo()" id="btn-redo" title="恢复 (Ctrl+Y)" disabled>↷</button>
+                <div class="divider"></div>
+                <button onclick="insertMd('h2')">H2 标题</button>
+                <button onclick="insertMd('bold')"><b>B</b> 粗体</button>
+                <div class="divider"></div>
+                <button onclick="insertMd('ul')">● 无序</button>
+                <button onclick="insertMd('ol')">1. 有序</button>
+                <div class="divider"></div>
+                <button onclick="insertMd('notice')">💡 卡片</button>
+                <button onclick="insertMd('task')">☑️ 待办</button>
+                <button onclick="insertMd('table')">📊 表格</button>
+                <button onclick="document.getElementById('file-upload').click()">🖼️ 插图</button>
+                <div class="divider"></div>
+                <button onclick="insertMd('pagebreak')" style="color: #ec4899;">✂️ 换页</button>
+            </div>
+            
+            <textarea id="md-input" placeholder="开始您的创作... (排版样式设置已移至右侧预览区顶部)"></textarea>
+            <div class="save-hint" id="save-hint">已自动同步至本地数据库</div>
+        </div>
+
+        <!-- ★ 右侧预览区：排版控制中心移入 ★ -->
+        <div class="preview-panel" id="preview-panel">
+            
+            <!-- 悬浮排版控制台 -->
+            <div class="settings-bar">
+                <select id="theme-select" title="主题皮肤">
+                    <option value="theme-default">✨ 小红书风</option>
+                    <option value="theme-minimal">✒️ 极简高冷</option>
+                    <option value="theme-cute">🎈 可爱手帐</option>
+                    <option value="theme-academic">📚 学术严谨</option>
+                </select>
+                
+                <select id="font-select" title="字体">
+                    <optgroup label="中文">
+                        <option value="'Noto Sans SC', sans-serif" selected>思源黑体</option>
+                        <option value="'Noto Serif SC', serif">思源宋体</option>
+                        <option value="'ZCOOL KuaiLe', cursive">站酷快乐体</option>
+                        <option value="'Ma Shan Zheng', cursive">马善政毛笔</option>
+                        <option value="'ZCOOL QingKe HuangYou', sans-serif">站酷黄油体</option>
+                    </optgroup>
+                    <optgroup label="English">
+                        <option value="'Roboto', sans-serif">Roboto</option>
+                        <option value="'Playfair Display', serif">Playfair</option>
+                        <option value="'Pacifico', cursive">Pacifico</option>
+                    </optgroup>
+                </select>
+
+                <select id="list-style-select" title="列表符号">
+                    <optgroup label="无序">
+                        <option value="default" selected>● 圆点</option>
+                        <option value="circle">○ 空心</option>
+                        <option value="square">■ 方块</option>
+                        <option value="emoji">🌈 Emoji</option>
+                    </optgroup>
+                    <optgroup label="有序">
+                        <option value="decimal">1. 数字</option>
+                        <option value="circled">❶ 圆圈</option>
+                    </optgroup>
+                </select>
+
+                <select id="ratio-select" title="画布尺寸">
+                    <option value="900x1200" selected>3:4 长图</option>
+                    <option value="1080x1080">1:1 方图</option>
+                    <option value="1080x1920">9:16 全屏</option>
+                </select>
+
+                <div class="setting-item" title="背景色">
+                    <input type="color" id="bg-color" value="#ffffff">
+                </div>
+
+                <div class="setting-item" title="字号">
+                    <span>A</span>
+                    <input type="range" id="font-size-range" min="16" max="32" value="22" step="1">
+                </div>
+                
+                <div class="setting-item" title="行距">
+                    <span>↕</span>
+                    <input type="range" id="line-height-range" min="1.2" max="2.4" value="1.8" step="0.1">
+                </div>
+
+                <label class="switch-label" title="开启第一页海报封面模式">
+                    <input type="checkbox" id="cover-mode-checkbox" checked> 封面
+                </label>
+
+                <input type="text" id="watermark-input" placeholder="输入水印 @ID" style="width: 140px;" />
+            </div>
+
+            <!-- 渲染画布区 -->
+            <div class="preview-content" id="preview-content">
+                <div class="scale-wrapper" id="scale-wrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航 (Mobile) -->
+    <div class="bottom-nav">
+        <div class="nav-item active" id="tab-edit" onclick="switchTab('edit')">
+            <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            写作区
+        </div>
+        <div class="nav-item" id="tab-preview" onclick="switchTab('preview')">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            排版预览
+        </div>
+    </div>
+
+    <div id="hidden-staging" style="display: none;"></div>
+
+    <script>
+        // ==========================================
+        // 第一部分：底层 IndexedDB 数据库引擎
+        // ==========================================
+        const DB_NAME = 'MarkdownPaginatorDB';
+        const DB_VERSION = 1;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('images')) db.createObjectStore('images');
+                    if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function dbSet(storeName, key, value) {
+            const db = await openDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).put(value, key);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async function dbGet(storeName, key) {
+            const db = await openDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(storeName, 'readonly');
+                const req = tx.objectStore(storeName).get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        async function cleanupUnusedImages(currentText) {
+            const db = await openDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction('images', 'readwrite');
+                const store = tx.objectStore('images');
+                const req = store.getAllKeys();
+                req.onsuccess = () => {
+                    const keys = req.result;
+                    keys.forEach(key => {
+                        if (!currentText.includes(key)) store.delete(key);
+                    });
+                    resolve();
+                };
+            });
+        }
+
+        // ==========================================
+        // 第二部分：界面交互与配置
+        // ==========================================
+        const CONFIG_KEY = 'md_config';
+        const DRAFT_KEY = 'md_draft';
+
+        const themeSelect = document.getElementById('theme-select');
+        const ratioSelect = document.getElementById('ratio-select');
+        const bgColorInput = document.getElementById('bg-color');
+        const watermarkInput = document.getElementById('watermark-input');
+        const coverModeCheckbox = document.getElementById('cover-mode-checkbox');
+        const fontSelect = document.getElementById('font-select'); 
+        const listStyleSelect = document.getElementById('list-style-select'); 
+        const fontSizeRange = document.getElementById('font-size-range');
+        const lineHeightRange = document.getElementById('line-height-range');
+        
+        const root = document.documentElement;
+        const scaleWrapper = document.getElementById('scale-wrapper');
+        const previewPanel = document.getElementById('preview-panel');
+        const previewContent = document.getElementById('preview-content');
+        const mdInput = document.getElementById('md-input');
+        const hiddenStaging = document.getElementById('hidden-staging');
+        const exportBtn = document.getElementById('export-btn');
+        const saveHint = document.getElementById('save-hint');
+        
+        const fileUpload = document.getElementById('file-upload');
+        const btnClear = document.getElementById('btn-clear');
+        const btnRestore = document.getElementById('btn-restore');
+        const mainContainer = document.getElementById('main-container');
+
+        let currentWidth = 900;
+        let isRendering = false; 
+        let lastClearedContent = ''; 
+
+        // 历史记录栈
+        let historyStack = [];
+        let historyIndex = -1;
+        let isHistoryTraversing = false;
+
+        // 默认文本
+        const defaultText = `# 🎉 V15 沉浸交互版\n\n现在，左侧彻底变成了清爽的打字机，右侧则是你的全能画布！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的“设置工具（主题/字号等）”都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置`;
+
+        marked.setOptions({ breaks: true, gfm: true });
+        if (typeof markedKatex !== 'undefined') marked.use(markedKatex({ throwOnError: false }));
+
+        // ★ 移动端 Tab 切换逻辑 ★
+        function switchTab(tab) {
+            const tabEdit = document.getElementById('tab-edit');
+            const tabPreview = document.getElementById('tab-preview');
+            if (tab === 'edit') {
+                mainContainer.classList.remove('show-preview');
+                tabEdit.classList.add('active');
+                tabPreview.classList.remove('active');
+            } else {
+                mainContainer.classList.add('show-preview');
+                tabEdit.classList.remove('active');
+                tabPreview.classList.add('active');
+                setTimeout(adjustScale, 50); // 延迟等待DOM显示后计算缩放
+            }
+        }
+
+        // 撤销/恢复功能
+        function saveHistory(text) {
+            if (isHistoryTraversing) return;
+            if (historyIndex >= 0 && historyStack[historyIndex] === text) return;
+            if (historyIndex < historyStack.length - 1) {
+                historyStack = historyStack.slice(0, historyIndex + 1);
+            }
+            historyStack.push(text);
+            if (historyStack.length > 50) historyStack.shift(); 
+            else historyIndex++;
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                isHistoryTraversing = true; historyIndex--;
+                mdInput.value = historyStack[historyIndex];
+                mdInput.dispatchEvent(new Event('input')); 
+                updateUndoRedoButtons(); isHistoryTraversing = false;
+            }
+        }
+
+        function redo() {
+            if (historyIndex < historyStack.length - 1) {
+                isHistoryTraversing = true; historyIndex++;
+                mdInput.value = historyStack[historyIndex];
+                mdInput.dispatchEvent(new Event('input')); 
+                updateUndoRedoButtons(); isHistoryTraversing = false;
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btn-undo').disabled = historyIndex <= 0;
+            document.getElementById('btn-redo').disabled = historyIndex >= historyStack.length - 1;
+        }
+
+        // Markdown 快捷操作
+        function insertMd(type) {
+            mdInput.focus();
+            const startPos = mdInput.selectionStart;
+            const endPos = mdInput.selectionEnd;
+            const text = mdInput.value;
+            const selectedText = text.substring(startPos, endPos);
+            let replacement = '';
+            let newCursorPos = 0;
+
+            if (type === 'bold') { replacement = `**${selectedText || '加粗文字'}**`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'h2') { replacement = `\n## ${selectedText || '输入二级标题'}\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'notice') { replacement = `\n>! ${selectedText || '在这里输入高亮重点内容...'}\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'task') { replacement = `\n- [ ] ${selectedText || '待办事项'}`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'ul') { replacement = `\n- ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'ol') { replacement = `\n1. ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'table') { replacement = `\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'math') { replacement = `\n$$ ${selectedText || 'a^2 + b^2 = c^2'} $$\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'pagebreak') { replacement = `\n\n---\n\n`; newCursorPos = startPos + replacement.length; }
+
+            mdInput.value = text.substring(0, startPos) + replacement + text.substring(endPos);
+            
+            if (!selectedText && ['bold','h2','notice','task','ul','ol','math'].includes(type)) {
+                let offsetStart = 0, offsetEnd = 0;
+                if(type === 'bold') { offsetStart = 2; offsetEnd = 4; }
+                if(type === 'h2') { offsetStart = 4; offsetEnd = 6; }
+                if(type === 'notice') { offsetStart = 4; offsetEnd = 14; }
+                if(type === 'task') { offsetStart = 7; offsetEnd = 4; }
+                if(type === 'ul') { offsetStart = 3; offsetEnd = 3; }
+                if(type === 'ol') { offsetStart = 4; offsetEnd = 3; }
+                if(type === 'math') { offsetStart = 4; offsetEnd = 15; }
+                mdInput.selectionStart = startPos + offsetStart;
+                mdInput.selectionEnd = startPos + offsetStart + offsetEnd;
+            } else {
+                mdInput.selectionStart = newCursorPos;
+                mdInput.selectionEnd = newCursorPos;
+            }
+
+            mdInput.dispatchEvent(new Event('input'));
+        }
+
+        async function saveConfigAndDraft() {
+            const config = {
+                theme: themeSelect.value, watermark: watermarkInput.value,
+                ratio: ratioSelect.value, bgColor: bgColorInput.value,
+                coverMode: coverModeCheckbox.checked, font: fontSelect.value, 
+                listStyle: listStyleSelect.value, fontSize: fontSizeRange.value, lineHeight: lineHeightRange.value
+            };
+            await dbSet('data', CONFIG_KEY, JSON.stringify(config));
+            await dbSet('data', DRAFT_KEY, mdInput.value);
+            cleanupUnusedImages(mdInput.value); 
+            
+            saveHint.style.opacity = '1'; setTimeout(() => { saveHint.style.opacity = '0'; }, 2000);
+        }
+
+        async function loadConfigAndDraft() {
+            const savedDraft = await dbGet('data', DRAFT_KEY);
+            mdInput.value = savedDraft !== undefined ? savedDraft : defaultText;
+            
+            const configStr = await dbGet('data', CONFIG_KEY);
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                if(config.theme) themeSelect.value = config.theme;
+                if(config.watermark) watermarkInput.value = config.watermark;
+                if(config.coverMode !== undefined) coverModeCheckbox.checked = config.coverMode;
+                if(config.ratio) {
+                    ratioSelect.value = config.ratio;
+                    const [w, h] = config.ratio.split('x');
+                    currentWidth = parseInt(w);
+                    root.style.setProperty('--page-width', `${w}px`);
+                    root.style.setProperty('--page-height', `${h}px`);
+                }
+                if(config.bgColor) { bgColorInput.value = config.bgColor; root.style.setProperty('--page-bg-color', config.bgColor); }
+                if(config.font) { fontSelect.value = config.font; root.style.setProperty('--font-main', config.font); }
+                if(config.listStyle) { listStyleSelect.value = config.listStyle; }
+                if(config.fontSize) { fontSizeRange.value = config.fontSize; root.style.setProperty('--base-font-size', `${config.fontSize}px`); }
+                if(config.lineHeight) { lineHeightRange.value = config.lineHeight; root.style.setProperty('--base-line-height', config.lineHeight); }
+            }
+            saveHistory(mdInput.value); 
+            triggerRender();
+        }
+
+        btnClear.addEventListener('click', () => {
+            if(mdInput.value.trim() === '') return; 
+            if(confirm('确定要清空所有内容吗？\n(支持"恢复"找回)')) {
+                lastClearedContent = mdInput.value; mdInput.value = ''; 
+                btnRestore.style.display = 'inline-flex'; 
+                triggerRender(); saveConfigAndDraft(); saveHistory(''); 
+            }
+        });
+
+        btnRestore.addEventListener('click', () => {
+            if(lastClearedContent) {
+                mdInput.value = lastClearedContent; lastClearedContent = ''; 
+                btnRestore.style.display = 'none'; 
+                triggerRender(); saveConfigAndDraft(); saveHistory(mdInput.value); 
+            }
+        });
+
+        // 监听器更新
+        themeSelect.addEventListener('change', () => { saveConfigAndDraft(); triggerRender(); });
+        bgColorInput.addEventListener('input', (e) => { root.style.setProperty('--page-bg-color', e.target.value); saveConfigAndDraft(); });
+        coverModeCheckbox.addEventListener('change', () => { saveConfigAndDraft(); triggerRender(); }); 
+        fontSelect.addEventListener('change', (e) => { root.style.setProperty('--font-main', e.target.value); saveConfigAndDraft(); triggerRender(); });
+        listStyleSelect.addEventListener('change', () => { saveConfigAndDraft(); triggerRender(); });
+        
+        fontSizeRange.addEventListener('input', (e) => { root.style.setProperty('--base-font-size', `${e.target.value}px`); triggerRender(); });
+        fontSizeRange.addEventListener('change', saveConfigAndDraft); 
+        lineHeightRange.addEventListener('input', (e) => { root.style.setProperty('--base-line-height', e.target.value); triggerRender(); });
+        lineHeightRange.addEventListener('change', saveConfigAndDraft);
+
+        ratioSelect.addEventListener('change', (e) => {
+            const [width, height] = e.target.value.split('x');
+            currentWidth = parseInt(width);
+            root.style.setProperty('--page-width', `${width}px`);
+            root.style.setProperty('--page-height', `${height}px`);
+            adjustScale(); triggerRender(); saveConfigAndDraft();
+        });
+        watermarkInput.addEventListener('input', (e) => {
+            document.querySelectorAll('.watermark').forEach(el => el.innerText = e.target.value);
+            saveConfigAndDraft();
+        });
+
+        function adjustScale() {
+            // 使用 previewContent 计算，避免滚动条和内边距误差
+            const panelWidth = previewContent.clientWidth || window.innerWidth; 
+            let scale = (panelWidth - 40) / currentWidth; 
+            if (scale > 1) scale = 1; 
+            scaleWrapper.style.transform = `scale(${scale})`;
+            const currentHeight = parseInt(getComputedStyle(root).getPropertyValue('--page-height'));
+            const pageCount = scaleWrapper.children.length || 1;
+            scaleWrapper.style.height = `${(currentHeight * scale + 40) * pageCount}px`;
+        }
+        window.addEventListener('resize', adjustScale);
+
+        // ==========================================
+        // 第三部分：图片处理与渲染引擎
+        // ==========================================
+        async function processAndInsertImage(blob) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = async function(event) {
+                    const base64Data = event.target.result;
+                    const imgId = 'local_img_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                    await dbSet('images', imgId, base64Data);
+                    
+                    const startPos = mdInput.selectionStart;
+                    const endPos = mdInput.selectionEnd;
+                    const text = mdInput.value;
+                    const insertText = `\n![本地图片](${imgId})\n`;
+                    mdInput.value = text.substring(0, startPos) + insertText + text.substring(endPos);
+                    const newPos = startPos + insertText.length;
+                    mdInput.selectionStart = newPos;
+                    mdInput.selectionEnd = newPos;
+                    resolve();
+                };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        fileUpload.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (files.length === 0) return;
+            const uploadBtn = document.querySelector('button[onclick="document.getElementById(\'file-upload\').click()"]');
+            const originalText = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '⏳';
+            uploadBtn.disabled = true;
+            for (let i = 0; i < files.length; i++) {
+                await processAndInsertImage(files[i]);
+            }
+            fileUpload.value = ''; 
+            uploadBtn.innerHTML = originalText;
+            uploadBtn.disabled = false;
+            triggerRender();
+            saveConfigAndDraft();
+        });
+
+        mdInput.addEventListener('paste', async (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            let hasImage = false;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.includes('image/')) {
+                    e.preventDefault(); 
+                    hasImage = true;
+                    const blob = item.getAsFile();
+                    await processAndInsertImage(blob);
+                }
+            }
+            if (hasImage) {
+                triggerRender();
+                saveConfigAndDraft();
+            }
+        });
+
+        let renderTimeout;
+        mdInput.addEventListener('input', () => {
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(() => {
+                triggerRender();
+                saveConfigAndDraft();
+                if (!isHistoryTraversing) saveHistory(mdInput.value); 
+            }, 300);
+        });
+        
+        mdInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') { e.preventDefault(); undo(); } 
+                else if (e.key === 'y') { e.preventDefault(); redo(); }
+            }
+        });
+
+        async function triggerRender() {
+            if (isRendering) return;
+            isRendering = true;
+            try {
+                // 1. 基础 Markdown 解析
+                hiddenStaging.innerHTML = marked.parse(mdInput.value);
+
+                // 2. 解析后处理网感组件
+                const blockquotes = hiddenStaging.querySelectorAll('blockquote');
+                blockquotes.forEach(bq => {
+                    const firstP = bq.querySelector('p');
+                    if (firstP) {
+                        let text = firstP.innerHTML;
+                        if (text.match(/^[!！]\s?/)) {
+                            bq.classList.add('notice-box');
+                            firstP.innerHTML = text.replace(/^[!！]\s?/, '');
+                        }
+                    }
+                });
+
+                const uls = hiddenStaging.querySelectorAll('ul');
+                uls.forEach(ul => {
+                    if (ul.querySelector('input[type="checkbox"]')) {
+                        ul.classList.add('contains-task-list');
+                        const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
+                        checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
+                    }
+                });
+
+                // 3. 异步处理图片
+                const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
+                const loadPromises = imgs.map(img => {
+                    return new Promise(async (resolve) => {
+                        let src = img.getAttribute('src');
+                        if (src && src.startsWith('local_img_')) {
+                            const realBase64 = await dbGet('images', src);
+                            if (realBase64) img.src = realBase64;
+                            else img.alt = '⚠️ 图片已失效';
+                        }
+                        if (img.complete) resolve();
+                        else { img.onload = resolve; img.onerror = resolve; }
+                    });
+                });
+                await Promise.all(loadPromises);
+                
+                // 4. 执行智能分页
+                paginateNodes();
+            } finally {
+                isRendering = false;
+            }
+        }
+
+        function createNewPage(pageIndex) {
+            const page = document.createElement('div');
+            page.className = `page ${themeSelect.value}`; 
+            
+            page.setAttribute('data-list-style', listStyleSelect.value);
+
+            if (pageIndex === 1 && coverModeCheckbox.checked) {
+                page.classList.add('page-cover');
+            }
+
+            const content = document.createElement('div');
+            content.className = 'page-content';
+            page.appendChild(content);
+
+            const footer = document.createElement('div');
+            footer.className = 'page-footer';
+            const watermark = document.createElement('div');
+            watermark.className = 'watermark';
+            watermark.innerText = watermarkInput.value; 
+            const indicator = document.createElement('div');
+            indicator.className = 'page-indicator';
+            indicator.innerText = `- ${pageIndex} -`; 
+
+            footer.appendChild(watermark);
+            footer.appendChild(indicator);
+            page.appendChild(footer);
+            return { page, content };
+        }
+
+        // ==========================================
+        // 第四部分：强制分页与智能折断引擎
+        // ==========================================
+        function paginateNodes() {
+            scaleWrapper.innerHTML = '';
+            let pageIndex = 1;
+            let current = createNewPage(pageIndex);
+            scaleWrapper.appendChild(current.page);
+
+            let queue = Array.from(hiddenStaging.childNodes);
+
+            while (queue.length > 0) {
+                let node = queue.shift();
+                if (node.nodeType === 3 && node.textContent.trim() === '') continue;
+
+                if (node.tagName === 'HR') {
+                    if (queue.length > 0) {
+                        pageIndex++;
+                        current = createNewPage(pageIndex);
+                        scaleWrapper.appendChild(current.page);
+                    }
+                    continue; 
+                }
+
+                current.content.appendChild(node);
+
+                if (current.page.scrollHeight > current.page.clientHeight) {
+                    current.content.removeChild(node);
+
+                    if (current.content.childNodes.length === 0 && node.tagName !== 'P') {
+                        current.content.appendChild(node);
+                        if (queue.length > 0) {
+                            pageIndex++;
+                            current = createNewPage(pageIndex);
+                            scaleWrapper.appendChild(current.page);
+                        }
+                        continue;
+                    }
+
+                    if (node.tagName === 'P') {
+                        let p1 = document.createElement('p');
+                        let p2 = document.createElement('p');
+                        current.content.appendChild(p1);
+
+                        let childQueue = Array.from(node.childNodes);
+                        let overflowed = false;
+                        let addedSomethingToP1 = false;
+
+                        while (childQueue.length > 0) {
+                            let child = childQueue.shift();
+                            p1.appendChild(child);
+
+                            if (current.page.scrollHeight > current.page.clientHeight) {
+                                p1.removeChild(child);
+                                overflowed = true;
+
+                                if (child.nodeType === Node.TEXT_NODE) {
+                                    let text = child.textContent;
+                                    let low = 0, high = text.length, best = 0;
+                                    while (low <= high) {
+                                        let mid = Math.floor((low + high) / 2);
+                                        let tempText = document.createTextNode(text.substring(0, mid));
+                                        p1.appendChild(tempText);
+                                        
+                                        if (current.page.scrollHeight <= current.page.clientHeight) {
+                                            best = mid; low = mid + 1; 
+                                        } else {
+                                            high = mid - 1; 
+                                        }
+                                        p1.removeChild(tempText);
+                                    }
+                                    
+                                    if (best > 0) {
+                                        p1.appendChild(document.createTextNode(text.substring(0, best)));
+                                        addedSomethingToP1 = true;
+                                    }
+                                    let remainder = text.substring(best);
+                                    if (remainder) p2.appendChild(document.createTextNode(remainder));
+                                } else {
+                                    if (p1.childNodes.length === 0 && current.content.childNodes.length <= 1) {
+                                        p1.appendChild(child);
+                                        addedSomethingToP1 = true;
+                                    } else {
+                                        p2.appendChild(child);
+                                    }
+                                }
+
+                                while (childQueue.length > 0) { p2.appendChild(childQueue.shift()); }
+                                break;
+                            } else {
+                                addedSomethingToP1 = true;
+                            }
+                        }
+
+                        if (overflowed) {
+                            if (!addedSomethingToP1) {
+                                current.content.removeChild(p1);
+                                if (current.content.childNodes.length === 0) {
+                                    current.content.appendChild(p1);
+                                    if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
+                                        queue.unshift(p2);
+                                    }
+                                    pageIndex++;
+                                    current = createNewPage(pageIndex);
+                                    scaleWrapper.appendChild(current.page);
+                                } else {
+                                    pageIndex++;
+                                    current = createNewPage(pageIndex);
+                                    scaleWrapper.appendChild(current.page);
+                                    queue.unshift(node);
+                                }
+                            } else {
+                                pageIndex++;
+                                current = createNewPage(pageIndex);
+                                scaleWrapper.appendChild(current.page);
+                                if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
+                                    queue.unshift(p2);
+                                }
+                            }
+                        }
+                    } else {
+                        pageIndex++;
+                        current = createNewPage(pageIndex);
+                        scaleWrapper.appendChild(current.page);
+                        queue.unshift(node);
+                    }
+                }
+            }
+
+            adjustScale();
+            updateExportBtnText();
+        }
+
+        function updateExportBtnText() {
+            const count = document.querySelectorAll('.page').length;
+            if (count > 1) exportBtn.innerText = `打包ZIP (${count})`;
+            else exportBtn.innerText = `保存大图`;
+        }
+
+        // ==========================================
+        // 第五部分：打包导出功能
+        // ==========================================
+        async function exportImages() {
+            const pages = document.querySelectorAll('.page');
+            if (pages.length === 0) return;
+
+            const isZip = pages.length > 1;
+            exportBtn.innerText = '正在生成...';
+            exportBtn.disabled = true;
+
+            const originalTransform = scaleWrapper.style.transform;
+            scaleWrapper.style.transform = 'scale(1)';
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            try {
+                const currentBgColor = getComputedStyle(root).getPropertyValue('--page-bg-color').trim();
+                let zip = null;
+                if (isZip) { zip = new JSZip(); } 
+
+                for (let i = 0; i < pages.length; i++) {
+                    const canvas = await html2canvas(pages[i], {
+                        scale: 2, 
+                        useCORS: true, 
+                        backgroundColor: currentBgColor, 
+                        logging: false 
+                    });
+                    
+                    const base64Data = canvas.toDataURL('image/png');
+                    
+                    if (isZip) {
+                        const pureBase64 = base64Data.split(',')[1];
+                        zip.file(`图文_P${i + 1}.png`, pureBase64, {base64: true});
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = `图文内容.png`;
+                        link.href = base64Data;
+                        link.click();
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                }
+
+                if (isZip) {
+                    exportBtn.innerText = '压缩打包...';
+                    const content = await zip.generateAsync({type:"blob"});
+                    saveAs(content, "高清图文合集.zip");
+                }
+
+            } catch (error) {
+                alert("处理失败，请检查是否使用了存在限制的网络图片。");
+                console.error(error);
+            } finally {
+                scaleWrapper.style.transform = originalTransform;
+                updateExportBtnText();
+                exportBtn.disabled = false;
+            }
+        }
+
+        // 初始化运行
+        adjustScale();
+        loadConfigAndDraft();
+    </script>
+</body>
+</html>
