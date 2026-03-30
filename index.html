@@ -19,7 +19,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400;700&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@300;400;700;900&family=Noto+Serif+SC:wght@300;400;700;900&family=Pacifico&family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;700&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400;700&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@300;400;700;900&family=Noto+Serif+SC:wght@300;400;700;900&family=Pacifico&family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;700&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=ZCOOL+XiaoWei&family=ZCOOL+QingKe+NianZhi&family=ZCOOL+YouShu&family=ZCOOL+QingKe+BenYuan&family=ZCOOL+KaiShu&display=swap" rel="stylesheet">
     
     <!-- KaTeX -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -36,6 +36,7 @@
             --font-main: 'Noto Sans SC', sans-serif;
             --base-font-size: 22px;
             --base-line-height: 1.8;
+            --text-align: justify;
             
             /* 主题色变量 */
             --theme-color: #ff4d4f; 
@@ -46,6 +47,17 @@
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f5f5f7; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* 动画效果 */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
         
         /* 顶部极简工具栏 */
         .header { background: #ffffff; padding: 12px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; z-index: 10; flex-shrink: 0;}
@@ -128,8 +140,8 @@
         .page.page-cover .page-footer { display: none !important; }
 
         /* 排版样式库 */
-        .page-content { font-size: var(--base-font-size); line-height: var(--base-line-height); word-wrap: break-word; word-break: break-all; } 
-        .page-content p { margin-bottom: 24px; text-align: justify; letter-spacing: 0.5px; }
+        .page-content { font-size: var(--base-font-size); line-height: var(--base-line-height); word-wrap: break-word; word-break: break-all; text-align: var(--text-align); } 
+        .page-content p { margin-bottom: 24px; text-align: var(--text-align); letter-spacing: 0.5px; }
         .page-content img { max-width: 100%; max-height: 950px; width: auto; height: auto; border-radius: 12px; display: block; margin: 35px auto; box-shadow: 0 4px 16px rgba(0,0,0,0.06); object-fit: contain; }
         
         .page-content blockquote.notice-box { background: linear-gradient(135deg, #fef3c7 0%, #fefce8 100%) !important; border-left: 8px solid #f59e0b !important; border-radius: 8px 16px 16px 8px !important; padding: 20px 25px !important; margin: 30px 0 !important; color: #b45309 !important; font-weight: bold !important; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15) !important; position: relative; font-style: normal !important; }
@@ -148,9 +160,17 @@
         .page-content th { background-color: #f8f9fa; font-weight: 900; color: #333; }
         .page-content tr:nth-child(even) { background-color: #fafafa; }
         
-        .page-content pre { background: #282c34; color: #abb2bf; padding: 40px 20px 20px; border-radius: 12px; overflow-x: auto; font-size: 16px; margin: 25px 0; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-family: 'Courier New', Courier, monospace; }
+        .page-content pre { background: #282c34; color: #abb2bf; padding: 40px 20px 20px; border-radius: 12px; overflow-x: auto; font-size: 16px; margin: 25px 0; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-family: 'Courier New', Courier, monospace; text-align: left; }
         .page-content pre::before { content: ''; position: absolute; top: 15px; left: 15px; width: 12px; height: 12px; border-radius: 50%; background: #fc625d; box-shadow: 20px 0 #fdbc40, 40px 0 #35cd4b; }
         .page-content p > code, .page-content li > code, .page-content table code { background: #f2f2f7; color: #ec4899; padding: 4px 8px; border-radius: 6px; font-size: 0.9em; border: 1px solid #e5e5ea; font-weight: bold; }
+        
+        /* 新增格式样式 */
+        .page-content em { color: #666; font-style: italic; }
+        .page-content s { color: #999; text-decoration: line-through; }
+        .page-content blockquote { border-left: 5px solid #d1d1d6; margin: 30px 0; padding: 15px 25px; background: rgba(0,0,0,0.03); border-radius: 0 8px 8px 0; color: #666; font-style: italic; }
+        .page-content a { color: #007aff; text-decoration: none; border-bottom: 2px solid #e0f2fe; padding-bottom: 1px; font-weight: 500; }
+        .page-content a:hover { background: #f0f9ff; border-radius: 3px; }
+        .page-content h3 { font-size: 28px; color: #333; margin-top: 40px; margin-bottom: 20px; font-weight: 700; padding-left: 12px; border-left: 4px solid var(--theme-color); }
 
         /* 列表样式分发 */
         .page-content ul { padding-left: 10px; margin-bottom: 24px; list-style: none; }
@@ -294,18 +314,28 @@
                 <button onclick="undo()" id="btn-undo" title="撤销 (Ctrl+Z)" disabled>↶</button>
                 <button onclick="redo()" id="btn-redo" title="恢复 (Ctrl+Y)" disabled>↷</button>
                 <div class="divider"></div>
+                <button onclick="insertMd('h1')">H1 标题</button>
                 <button onclick="insertMd('h2')">H2 标题</button>
+                <button onclick="insertMd('h3')">H3 标题</button>
+                <div class="divider"></div>
                 <button onclick="insertMd('bold')"><b>B</b> 粗体</button>
+                <button onclick="insertMd('italic')"><i>I</i> 斜体</button>
+                <button onclick="insertMd('strikethrough')"><s>S</s> 删除</button>
+                <button onclick="insertMd('code')"><code>`</code> 代码</button>
                 <div class="divider"></div>
                 <button onclick="insertMd('ul')">● 无序</button>
                 <button onclick="insertMd('ol')">1. 有序</button>
+                <button onclick="insertMd('quote')">💬 引用</button>
                 <div class="divider"></div>
                 <button onclick="insertMd('notice')">💡 卡片</button>
                 <button onclick="insertMd('task')">☑️ 待办</button>
                 <button onclick="insertMd('table')">📊 表格</button>
-                <button onclick="insertMd('math')" style="display:none;">∑ 公式</button>
+                <button onclick="insertMd('link')">🔗 链接</button>
                 <button onclick="document.getElementById('file-upload').click()">🖼️ 插图</button>
                 <div class="divider"></div>
+                <button onclick="insertMd('codeblock')">📝 代码块</button>
+                <button onclick="insertMd('math')" title="数学公式">∑ 公式</button>
+                <button onclick="insertMd('toc')" title="生成目录">📑 目录</button>
                 <button onclick="insertMd('pagebreak')" style="color: #ec4899;">✂️ 换页</button>
             </div>
             
@@ -329,15 +359,27 @@
                     <optgroup label="中文">
                         <option value="'Noto Sans SC', sans-serif" selected>思源黑体</option>
                         <option value="'Noto Serif SC', serif">思源宋体</option>
+                        <option value="'ZCOOL QingKe HuangYou', sans-serif">站酷黄油体</option>
+                        <option value="'ZCOOL XiaoWei', serif">站酷小薇体</option>
+                        <option value="'ZCOOL QingKe NianZhi', sans-serif">站酷庆科黄油体</option>
+                        <option value="'ZCOOL YouShu', serif">站酷优设体</option>
+                        <option value="'ZCOOL QingKe BenYuan', sans-serif">站酷庆科本元体</option>
+                        <option value="'ZCOOL KaiShu', serif">站酷楷体</option>
                         <option value="'ZCOOL KuaiLe', cursive">站酷快乐体</option>
                         <option value="'Ma Shan Zheng', cursive">马善政毛笔</option>
-                        <option value="'ZCOOL QingKe HuangYou', sans-serif">站酷黄油体</option>
                     </optgroup>
                     <optgroup label="English">
                         <option value="'Roboto', sans-serif">Roboto</option>
                         <option value="'Playfair Display', serif">Playfair</option>
                         <option value="'Pacifico', cursive">Pacifico</option>
                     </optgroup>
+                </select>
+                
+                <select id="text-align-select" title="文本对齐">
+                    <option value="justify" selected>两端对齐</option>
+                    <option value="left">左对齐</option>
+                    <option value="center">居中对齐</option>
+                    <option value="right">右对齐</option>
                 </select>
 
                 <select id="list-style-select" title="列表符号">
@@ -471,6 +513,7 @@
         const listStyleSelect = document.getElementById('list-style-select'); 
         const fontSizeRange = document.getElementById('font-size-range');
         const lineHeightRange = document.getElementById('line-height-range');
+        const textAlignSelect = document.getElementById('text-align-select');
         
         const root = document.documentElement;
         const scaleWrapper = document.getElementById('scale-wrapper');
@@ -564,26 +607,44 @@
             let newCursorPos = 0;
 
             if (type === 'bold') { replacement = `**${selectedText || '加粗文字'}**`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'italic') { replacement = `*${selectedText || '斜体文字'}*`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'strikethrough') { replacement = `~~${selectedText || '删除文字'}~~`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'code') { replacement = `\`${selectedText || '代码'}\``; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'codeblock') { replacement = `\n\`\`\`${selectedText ? selectedText : 'javascript\nconsole.log("Hello World");'}\n\`\`\`\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'h1') { replacement = `\n# ${selectedText || '输入一级标题'}\n`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'h2') { replacement = `\n## ${selectedText || '输入二级标题'}\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'h3') { replacement = `\n### ${selectedText || '输入三级标题'}\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'quote') { replacement = `\n> ${selectedText || '引用内容'}\n`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'notice') { replacement = `\n>! ${selectedText || '在这里输入高亮重点内容...'}\n`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'task') { replacement = `\n- [ ] ${selectedText || '待办事项'}`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'ul') { replacement = `\n- ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'ol') { replacement = `\n1. ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'link') { replacement = `[${selectedText || '链接文字'}](https://example.com)`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'table') { replacement = `\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |\n`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'math') { replacement = `\n$$ ${selectedText || 'a^2 + b^2 = c^2'} $$\n`; newCursorPos = startPos + replacement.length; } 
+            else if (type === 'toc') { replacement = `\n## 目录\n\n[跳转到内容](#内容)\n\n`; newCursorPos = startPos + replacement.length; } 
             else if (type === 'pagebreak') { replacement = `\n\n---\n\n`; newCursorPos = startPos + replacement.length; }
 
             mdInput.value = text.substring(0, startPos) + replacement + text.substring(endPos);
             
-            if (!selectedText && ['bold','h2','notice','task','ul','ol','math'].includes(type)) {
+            if (!selectedText && ['bold','italic','strikethrough','code','codeblock','h1','h2','h3','notice','task','ul','ol','quote','link','math','toc'].includes(type)) {
                 let offsetStart = 0, offsetEnd = 0;
                 if(type === 'bold') { offsetStart = 2; offsetEnd = 4; }
+                if(type === 'italic') { offsetStart = 1; offsetEnd = 3; }
+                if(type === 'strikethrough') { offsetStart = 2; offsetEnd = 4; }
+                if(type === 'code') { offsetStart = 1; offsetEnd = 3; }
+                if(type === 'codeblock') { offsetStart = 4; offsetEnd = 10; }
+                if(type === 'h1') { offsetStart = 3; offsetEnd = 6; }
                 if(type === 'h2') { offsetStart = 4; offsetEnd = 6; }
+                if(type === 'h3') { offsetStart = 5; offsetEnd = 6; }
+                if(type === 'quote') { offsetStart = 3; offsetEnd = 4; }
                 if(type === 'notice') { offsetStart = 4; offsetEnd = 14; }
                 if(type === 'task') { offsetStart = 7; offsetEnd = 4; }
                 if(type === 'ul') { offsetStart = 3; offsetEnd = 3; }
                 if(type === 'ol') { offsetStart = 4; offsetEnd = 3; }
+                if(type === 'link') { offsetStart = 1; offsetEnd = 10; }
                 if(type === 'math') { offsetStart = 4; offsetEnd = 15; }
+                if(type === 'toc') { offsetStart = 7; offsetEnd = 10; }
                 mdInput.selectionStart = startPos + offsetStart;
                 mdInput.selectionEnd = startPos + offsetStart + offsetEnd;
             } else {
@@ -599,7 +660,8 @@
                 theme: themeSelect.value, watermark: watermarkInput.value,
                 ratio: ratioSelect.value, bgColor: bgColorInput.value,
                 coverMode: coverModeCheckbox.checked, font: fontSelect.value, 
-                listStyle: listStyleSelect.value, fontSize: fontSizeRange.value, lineHeight: lineHeightRange.value
+                listStyle: listStyleSelect.value, fontSize: fontSizeRange.value, lineHeight: lineHeightRange.value,
+                textAlign: textAlignSelect.value
             };
             await dbSet('data', CONFIG_KEY, JSON.stringify(config));
             await dbSet('data', DRAFT_KEY, mdInput.value);
@@ -630,6 +692,7 @@
                 if(config.listStyle) { listStyleSelect.value = config.listStyle; }
                 if(config.fontSize) { fontSizeRange.value = config.fontSize; root.style.setProperty('--base-font-size', `${config.fontSize}px`); }
                 if(config.lineHeight) { lineHeightRange.value = config.lineHeight; root.style.setProperty('--base-line-height', config.lineHeight); }
+                if(config.textAlign) { textAlignSelect.value = config.textAlign; root.style.setProperty('--text-align', config.textAlign); }
             }
             saveHistory(mdInput.value); 
             triggerRender();
@@ -637,11 +700,33 @@
 
         btnClear.addEventListener('click', () => {
             if(mdInput.value.trim() === '') return; 
-            if(confirm('确定要清空所有内容吗？\n(支持"恢复"找回)')) {
-                lastClearedContent = mdInput.value; mdInput.value = ''; 
-                btnRestore.style.display = 'inline-flex'; 
-                triggerRender(); saveConfigAndDraft(); saveHistory(''); 
-            }
+            // 移除confirm弹窗，直接清空内容
+            lastClearedContent = mdInput.value; 
+            mdInput.value = ''; 
+            btnRestore.style.display = 'inline-flex'; 
+            triggerRender(); 
+            saveConfigAndDraft(); 
+            saveHistory(''); 
+            // 显示清空提示
+            const clearHint = document.createElement('div');
+            clearHint.textContent = '内容已清空，可点击"恢复"按钮找回';
+            clearHint.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(clearHint);
+            setTimeout(() => {
+                clearHint.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => document.body.removeChild(clearHint), 300);
+            }, 3000);
         });
 
         btnRestore.addEventListener('click', () => {
@@ -658,6 +743,7 @@
         coverModeCheckbox.addEventListener('change', () => { saveConfigAndDraft(); triggerRender(); }); 
         fontSelect.addEventListener('change', (e) => { root.style.setProperty('--font-main', e.target.value); saveConfigAndDraft(); triggerRender(); });
         listStyleSelect.addEventListener('change', () => { saveConfigAndDraft(); triggerRender(); });
+        textAlignSelect.addEventListener('change', (e) => { root.style.setProperty('--text-align', e.target.value); saveConfigAndDraft(); triggerRender(); });
         
         fontSizeRange.addEventListener('input', (e) => { root.style.setProperty('--base-font-size', `${e.target.value}px`); triggerRender(); });
         fontSizeRange.addEventListener('change', saveConfigAndDraft); 
@@ -1006,12 +1092,58 @@
                 if (isZip) { zip = new JSZip(); } 
 
                 for (let i = 0; i < pages.length; i++) {
-                    const canvas = await html2canvas(pages[i], {
-                        scale: 2, 
-                        useCORS: true, 
-                        backgroundColor: currentBgColor, 
-                        logging: false 
+                    const page = pages[i];
+                    
+                    // 获取当前页面的内容元素
+                    const contentElement = page.querySelector('.page-content');
+                    const footerElement = page.querySelector('.page-footer');
+                    
+                    if (!contentElement || !footerElement) {
+                        console.warn(`页面 ${i + 1} 缺少必要的元素，跳过处理`);
+                        continue;
+                    }
+                    
+                    // 保持用户指定的固定尺寸
+                    const pageWidth = parseInt(getComputedStyle(root).getPropertyValue('--page-width'));
+                    const pageHeight = parseInt(getComputedStyle(root).getPropertyValue('--page-height'));
+                    
+                    // 直接使用原始页面进行捕获，避免克隆可能带来的跨域问题
+                    const originalPosition = page.style.position;
+                    const originalLeft = page.style.left;
+                    const originalTop = page.style.top;
+                    
+                    // 临时移动页面到可视区域外进行捕获
+                    page.style.position = 'absolute';
+                    page.style.left = '-9999px';
+                    page.style.top = '-9999px';
+                    page.style.width = pageWidth + 'px';
+                    page.style.height = pageHeight + 'px';
+                    page.style.overflow = 'hidden';
+                    
+                    // 捕获原始页面
+                    const canvas = await html2canvas(page, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: currentBgColor,
+                        logging: false,
+                        width: pageWidth,
+                        height: pageHeight,
+                        x: 0,
+                        y: 0,
+                        // 增加超时设置
+                        timeout: 30000,
+                        // 尝试使用不同的渲染方法
+                        allowTaint: true,
+                        foreignObjectRendering: false
                     });
+                    
+                    // 恢复页面原始位置
+                    page.style.position = originalPosition;
+                    page.style.left = originalLeft;
+                    page.style.top = originalTop;
+                    page.style.width = '';
+                    page.style.height = '';
+                    page.style.overflow = '';
                     
                     const base64Data = canvas.toDataURL('image/png');
                     
@@ -1035,9 +1167,37 @@
                 }
 
             } catch (error) {
-                alert("处理失败，请检查是否使用了存在限制的网络图片。");
-                console.error(error);
+                console.error("导出失败:", error);
+                
+                // 提供更详细的错误信息
+                let errorMessage = "处理失败，请检查：";
+                
+                if (error.message && error.message.includes('CORS')) {
+                    errorMessage += "\n• 网络图片存在跨域限制，请使用本地上传的图片";
+                } else if (error.message && error.message.includes('timeout')) {
+                    errorMessage += "\n• 处理超时，可能是图片过大或网络问题";
+                } else if (error.message && error.message.includes('Tainted')) {
+                    errorMessage += "\n• 图片安全策略限制，请更换图片来源";
+                } else {
+                    errorMessage += "\n• 是否使用了存在限制的网络图片";
+                    errorMessage += "\n• 图片格式是否支持";
+                    errorMessage += "\n• 浏览器权限是否完整";
+                }
+                
+                errorMessage += "\n\n建议：使用本地上传的图片，或更换其他图片来源。";
+                
+                alert(errorMessage);
             } finally {
+                // 确保恢复页面原始状态
+                pages.forEach(page => {
+                    page.style.position = '';
+                    page.style.left = '';
+                    page.style.top = '';
+                    page.style.width = '';
+                    page.style.height = '';
+                    page.style.overflow = '';
+                });
+                
                 scaleWrapper.style.transform = originalTransform;
                 updateExportBtnText();
                 exportBtn.disabled = false;
