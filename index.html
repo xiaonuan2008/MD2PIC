@@ -491,7 +491,12 @@
                 req.onsuccess = () => {
                     const keys = req.result;
                     keys.forEach(key => {
-                        if (!currentText.includes(key)) store.delete(key);
+                        // 使用更精确的匹配：检查是否存在 ![...](key) 格式的引用
+                        // 避免 key 是另一个 key 的前缀时被误删
+                        const pattern = new RegExp(`!\\[[^\\]]*\\]\\(${key}\\)`, 'g');
+                        if (!pattern.test(currentText)) {
+                            store.delete(key);
+                        }
                     });
                     resolve();
                 };
@@ -568,8 +573,12 @@
                 historyStack = historyStack.slice(0, historyIndex + 1);
             }
             historyStack.push(text);
-            if (historyStack.length > 50) historyStack.shift(); 
-            else historyIndex++;
+            if (historyStack.length > 50) {
+                historyStack.shift();
+                // 当超出限制时，historyIndex保持不变，因为我们移除了最早的一条
+            } else {
+                historyIndex++;
+            }
             updateUndoRedoButtons();
         }
 
@@ -855,49 +864,64 @@
             if (isRendering) return;
             isRendering = true;
             try {
-                // 1. 基础 Markdown 解析
-                hiddenStaging.innerHTML = marked.parse(mdInput.value);
+                try {
+                    // 1. 基础 Markdown 解析
+                    hiddenStaging.innerHTML = marked.parse(mdInput.value);
 
-                // 2. 解析后处理网感组件
-                const blockquotes = hiddenStaging.querySelectorAll('blockquote');
-                blockquotes.forEach(bq => {
-                    const firstP = bq.querySelector('p');
-                    if (firstP) {
-                        let text = firstP.innerHTML;
-                        if (text.match(/^[!！]\s?/)) {
-                            bq.classList.add('notice-box');
-                            firstP.innerHTML = text.replace(/^[!！]\s?/, '');
+                    // 2. 解析后处理网感组件
+                    const blockquotes = hiddenStaging.querySelectorAll('blockquote');
+                    blockquotes.forEach(bq => {
+                        const firstP = bq.querySelector('p');
+                        if (firstP) {
+                            let text = firstP.innerHTML;
+                            if (text.match(/^[!！]\s?/)) {
+                                bq.classList.add('notice-box');
+                                firstP.innerHTML = text.replace(/^[!！]\s?/, '');
+                            }
                         }
-                    }
-                });
-
-                const uls = hiddenStaging.querySelectorAll('ul');
-                uls.forEach(ul => {
-                    if (ul.querySelector('input[type="checkbox"]')) {
-                        ul.classList.add('contains-task-list');
-                        const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
-                        checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
-                    }
-                });
-
-                // 3. 异步处理图片
-                const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
-                const loadPromises = imgs.map(img => {
-                    return new Promise(async (resolve) => {
-                        let src = img.getAttribute('src');
-                        if (src && src.startsWith('local_img_')) {
-                            const realBase64 = await dbGet('images', src);
-                            if (realBase64) img.src = realBase64;
-                            else img.alt = '⚠️ 图片已失效';
-                        }
-                        if (img.complete) resolve();
-                        else { img.onload = resolve; img.onerror = resolve; }
                     });
-                });
-                await Promise.all(loadPromises);
-                
-                // 4. 执行智能分页
-                paginateNodes();
+
+                    const uls = hiddenStaging.querySelectorAll('ul');
+                    uls.forEach(ul => {
+                        if (ul.querySelector('input[type="checkbox"]')) {
+                            ul.classList.add('contains-task-list');
+                            const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
+                            checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
+                        }
+                    });
+
+                    // 3. 异步处理图片
+                    const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
+                    const loadPromises = imgs.map(img => {
+                        return new Promise(async (resolve) => {
+                            let src = img.getAttribute('src');
+                            if (src && src.startsWith('local_img_')) {
+                                const realBase64 = await dbGet('images', src);
+                                if (realBase64) img.src = realBase64;
+                                else img.alt = '⚠️ 图片已失效';
+                            }
+                            if (img.complete) resolve();
+                            else { img.onload = resolve; img.onerror = resolve; }
+                        });
+                    });
+                    await Promise.all(loadPromises);
+                    
+                    // 4. 执行智能分页
+                    paginateNodes();
+                } catch (error) {
+                    console.error('渲染出错:', error);
+                    // 显示错误提示给用户
+                    scaleWrapper.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: #666;">
+                            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                            <h3 style="margin: 0 0 10px 0;">渲染出错</h3>
+                            <p style="margin: 0 0 20px 0;">${error.message || '请检查您的输入内容'}</p>
+                            <button onclick="location.reload()" style="padding: 10px 20px; background: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                                重置页面
+                            </button>
+                        </div>
+                    `;
+                }
             } finally {
                 isRendering = false;
             }
@@ -1091,37 +1115,41 @@
                 let zip = null;
                 if (isZip) { zip = new JSZip(); } 
 
+                // 创建临时渲染容器（不移到视口外）
+                const tempContainer = document.createElement('div');
+                tempContainer.style.cssText = `
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    z-index: -9999;
+                    opacity: 0;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(tempContainer);
+
                 for (let i = 0; i < pages.length; i++) {
                     const page = pages[i];
                     
-                    // 获取当前页面的内容元素
-                    const contentElement = page.querySelector('.page-content');
-                    const footerElement = page.querySelector('.page-footer');
-                    
-                    if (!contentElement || !footerElement) {
-                        console.warn(`页面 ${i + 1} 缺少必要的元素，跳过处理`);
-                        continue;
-                    }
-                    
-                    // 保持用户指定的固定尺寸
+                    // 获取用户指定的固定尺寸
                     const pageWidth = parseInt(getComputedStyle(root).getPropertyValue('--page-width'));
                     const pageHeight = parseInt(getComputedStyle(root).getPropertyValue('--page-height'));
                     
-                    // 直接使用原始页面进行捕获，避免克隆可能带来的跨域问题
-                    const originalPosition = page.style.position;
-                    const originalLeft = page.style.left;
-                    const originalTop = page.style.top;
+                    // 克隆节点到临时容器
+                    const clone = page.cloneNode(true);
+                    clone.style.width = pageWidth + 'px';
+                    clone.style.height = pageHeight + 'px';
+                    clone.style.position = 'relative';
+                    clone.style.left = '0';
+                    clone.style.top = '0';
+                    clone.style.margin = '0';
+                    tempContainer.appendChild(clone);
                     
-                    // 临时移动页面到可视区域外进行捕获
-                    page.style.position = 'absolute';
-                    page.style.left = '-9999px';
-                    page.style.top = '-9999px';
-                    page.style.width = pageWidth + 'px';
-                    page.style.height = pageHeight + 'px';
-                    page.style.overflow = 'hidden';
+                    // 等待字体渲染（确保特殊字体正确显示）
+                    await document.fonts.ready;
+                    await new Promise(resolve => setTimeout(resolve, 100));
                     
-                    // 捕获原始页面
-                    const canvas = await html2canvas(page, {
+                    // 捕获克隆页面
+                    const canvas = await html2canvas(clone, {
                         scale: 2,
                         useCORS: true,
                         backgroundColor: currentBgColor,
@@ -1130,35 +1158,31 @@
                         height: pageHeight,
                         x: 0,
                         y: 0,
-                        // 增加超时设置
                         timeout: 30000,
-                        // 尝试使用不同的渲染方法
                         allowTaint: true,
                         foreignObjectRendering: false
                     });
                     
-                    // 恢复页面原始位置
-                    page.style.position = originalPosition;
-                    page.style.left = originalLeft;
-                    page.style.top = originalTop;
-                    page.style.width = '';
-                    page.style.height = '';
-                    page.style.overflow = '';
+                    // 清理克隆节点
+                    tempContainer.removeChild(clone);
                     
                     const base64Data = canvas.toDataURL('image/png');
                     
                     if (isZip) {
                         const pureBase64 = base64Data.split(',')[1];
                         zip.file(`图文_P${i + 1}.png`, pureBase64, {base64: true});
+                        // 更新进度提示
+                        exportBtn.innerText = `正在生成... ${i + 1}/${pages.length}`;
                     } else {
                         const link = document.createElement('a');
                         link.download = `图文内容.png`;
                         link.href = base64Data;
                         link.click();
                     }
-                    
-                    await new Promise(resolve => setTimeout(resolve, 150));
                 }
+
+                // 清理临时容器
+                document.body.removeChild(tempContainer);
 
                 if (isZip) {
                     exportBtn.innerText = '压缩打包...';
@@ -1188,16 +1212,6 @@
                 
                 alert(errorMessage);
             } finally {
-                // 确保恢复页面原始状态
-                pages.forEach(page => {
-                    page.style.position = '';
-                    page.style.left = '';
-                    page.style.top = '';
-                    page.style.width = '';
-                    page.style.height = '';
-                    page.style.overflow = '';
-                });
-                
                 scaleWrapper.style.transform = originalTransform;
                 updateExportBtnText();
                 exportBtn.disabled = false;
