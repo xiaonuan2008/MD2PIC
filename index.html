@@ -59,6 +59,47 @@
             to { transform: translateX(100%); opacity: 0; }
         }
         
+        @keyframes toastSlideIn {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes toastSlideOut {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-100%); opacity: 0; }
+        }
+        
+        /* Toast 提示 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: toastSlideIn 0.3s ease;
+            max-width: 300px;
+        }
+        
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+        .toast.info { background: #0ea5e9; }
+        .toast.warning { background: #f59e0b; }
+        
+        .toast.hiding {
+            animation: toastSlideOut 0.3s ease forwards;
+        }
+        
         /* 顶部极简工具栏 */
         .header { background: #ffffff; padding: 12px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; z-index: 10; flex-shrink: 0;}
         .header-left { display: flex; align-items: center; gap: 10px; }
@@ -442,6 +483,9 @@
     </div>
 
     <div id="hidden-staging" style="display: none;"></div>
+    
+    <!-- Toast 提示容器 -->
+    <div id="toast-container" class="toast-container"></div>
 
     <script>
         // ==========================================
@@ -504,10 +548,31 @@
         }
 
         // ==========================================
+        // Toast 提示功能
+        // ==========================================
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        // ==========================================
         // 第二部分：界面交互与配置
         // ==========================================
         const CONFIG_KEY = 'md_config';
         const DRAFT_KEY = 'md_draft';
+        const CLEARED_CONTENT_KEY = 'md_cleared_content';
 
         const themeSelect = document.getElementById('theme-select');
         const ratioSelect = document.getElementById('ratio-select');
@@ -703,46 +768,42 @@
                 if(config.lineHeight) { lineHeightRange.value = config.lineHeight; root.style.setProperty('--base-line-height', config.lineHeight); }
                 if(config.textAlign) { textAlignSelect.value = config.textAlign; root.style.setProperty('--text-align', config.textAlign); }
             }
+            
+            // 加载是否有可恢复的内容
+            const savedClearedContent = await dbGet('data', CLEARED_CONTENT_KEY);
+            if (savedClearedContent && savedClearedContent.trim() !== '') {
+                lastClearedContent = savedClearedContent;
+                btnRestore.style.display = 'inline-flex';
+            }
+            
             saveHistory(mdInput.value); 
             triggerRender();
         }
 
-        btnClear.addEventListener('click', () => {
+        btnClear.addEventListener('click', async () => {
             if(mdInput.value.trim() === '') return; 
             // 移除confirm弹窗，直接清空内容
             lastClearedContent = mdInput.value; 
+            await dbSet('data', CLEARED_CONTENT_KEY, lastClearedContent); 
             mdInput.value = ''; 
             btnRestore.style.display = 'inline-flex'; 
             triggerRender(); 
             saveConfigAndDraft(); 
             saveHistory(''); 
-            // 显示清空提示
-            const clearHint = document.createElement('div');
-            clearHint.textContent = '内容已清空，可点击"恢复"按钮找回';
-            clearHint.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #10b981;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                font-weight: bold;
-                z-index: 10000;
-                animation: slideIn 0.3s ease;
-            `;
-            document.body.appendChild(clearHint);
-            setTimeout(() => {
-                clearHint.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => document.body.removeChild(clearHint), 300);
-            }, 3000);
+            // 使用Toast提示
+            showToast('内容已清空，可点击"恢复"按钮找回', 'success');
         });
 
-        btnRestore.addEventListener('click', () => {
+        btnRestore.addEventListener('click', async () => {
             if(lastClearedContent) {
-                mdInput.value = lastClearedContent; lastClearedContent = ''; 
+                mdInput.value = lastClearedContent; 
+                lastClearedContent = ''; 
+                await dbSet('data', CLEARED_CONTENT_KEY, ''); 
                 btnRestore.style.display = 'none'; 
-                triggerRender(); saveConfigAndDraft(); saveHistory(mdInput.value); 
+                triggerRender(); 
+                saveConfigAndDraft(); 
+                saveHistory(mdInput.value); 
+                showToast('内容已恢复', 'success');
             }
         });
 
@@ -1188,6 +1249,9 @@
                     exportBtn.innerText = '压缩打包...';
                     const content = await zip.generateAsync({type:"blob"});
                     saveAs(content, "高清图文合集.zip");
+                    showToast(`成功导出 ${pages.length} 张图片并打包`, 'success');
+                } else {
+                    showToast('图片导出成功', 'success');
                 }
 
             } catch (error) {
@@ -1210,6 +1274,7 @@
                 
                 errorMessage += "\n\n建议：使用本地上传的图片，或更换其他图片来源。";
                 
+                showToast('导出失败，请查看提示', 'error');
                 alert(errorMessage);
             } finally {
                 scaleWrapper.style.transform = originalTransform;
