@@ -1,0 +1,19 @@
+# MD2PIC - Cloudflare Pages Headers
+
+# 安全头部
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# 缓存策略
+# 缓存 HTML 1小时，其他资源 1年
+/*.html
+  Cache-Control: public, max-age=3600, must-revalidate
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.md
+  Cache-Control: public, max-age=3600, must-revalidate

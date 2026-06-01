@@ -9,9 +9,12 @@
 
 ## 🚀 快速开始
 
+### 方式 1: 本地运行
 **无需安装！无需配置！**
-
 直接双击打开 [`index.html`](index.html) 即可使用 ✨
+
+### 方式 2: Cloudflare Pages 部署
+详细步骤请查看 [`DEPLOYMENT.md`](DEPLOYMENT.md)
 
 ---
 
@@ -88,15 +91,18 @@ $$ a^2 + b^2 = c^2 $$
 
 ## 📁 项目文档
 
-- [CODE_WIKI.md](CODE_WIKI.md) - 完整代码 Wiki 文档（架构/模块/函数说明）
-- [TEST_REPORT.md](TEST_REPORT.md) - 测试报告
-- [ANALYSIS_REPORT.md](ANALYSIS_REPORT.md) - 深度分析与改进建议
-- [FIXES_SUMMARY.md](FIXES_SUMMARY.md) - 已修复问题总结
-- [ROADMAP.md](ROADMAP.md) - 更新迭代计划
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Cloudflare Pages 部署指南
+- [docs/CODE_WIKI.md](docs/CODE_WIKI.md) - 完整代码 Wiki 文档（架构/模块/函数说明）
+- [docs/TEST_REPORT.md](docs/TEST_REPORT.md) - 测试报告
+- [docs/ANALYSIS_REPORT.md](docs/ANALYSIS_REPORT.md) - 深度分析与改进建议
+- [docs/FIXES_SUMMARY.md](docs/FIXES_SUMMARY.md) - 已修复问题总结
+- [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) - 项目目录结构设计
+- [docs/ROADMAP.md](docs/ROADMAP.md) - 更新迭代计划
+- [docs/VERSION_v1.1.0.md](docs/VERSION_v1.1.0.md) - v1.1.0 更新日志
 
 ---
 
-## 🎯 v1.0 更新内容
+## 🎯 v1.1.0 更新内容
 
 ### 新特性
 - ✅ 撤销/重做功能优化（50条历史记录）
