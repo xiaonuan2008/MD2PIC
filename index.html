@@ -104,6 +104,9 @@
             padding: 12px 20px; border-bottom: 1px solid #e5e5ea;
             display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
         }
 
         .settings-bar select, .settings-bar input[type="text"] {
@@ -250,6 +253,9 @@
             .settings-bar {
                 padding: 10px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
                 -webkit-overflow-scrolling: touch; border-radius: 0; margin: 0; box-shadow: none; border-bottom: 1px solid #e5e5ea;
+                -webkit-user-select: none;
+                user-select: none;
+                touch-action: pan-x;
             }
             .settings-bar::-webkit-scrollbar { display: none; }
             .settings-bar > * { flex-shrink: 0; }
@@ -314,29 +320,31 @@
                 <button onclick="undo()" id="btn-undo" title="撤销 (Ctrl+Z)" disabled>↶</button>
                 <button onclick="redo()" id="btn-redo" title="恢复 (Ctrl+Y)" disabled>↷</button>
                 <div class="divider"></div>
-                <button onclick="insertMd('h1')">H1 标题</button>
-                <button onclick="insertMd('h2')">H2 标题</button>
-                <button onclick="insertMd('h3')">H3 标题</button>
+                <button onclick="insertMd('h1')" title="H1 标题 (Ctrl+1)">H1</button>
+                <button onclick="insertMd('h2')" title="H2 标题 (Ctrl+2)">H2</button>
+                <button onclick="insertMd('h3')" title="H3 标题 (Ctrl+3)">H3</button>
                 <div class="divider"></div>
-                <button onclick="insertMd('bold')"><b>B</b> 粗体</button>
-                <button onclick="insertMd('italic')"><i>I</i> 斜体</button>
-                <button onclick="insertMd('strikethrough')"><s>S</s> 删除</button>
-                <button onclick="insertMd('code')"><code>`</code> 代码</button>
+                <button onclick="insertMd('bold')" title="粗体 (Ctrl+B)"><b>B</b></button>
+                <button onclick="insertMd('italic')" title="斜体 (Ctrl+I)"><i>I</i></button>
+                <button onclick="insertMd('strikethrough')" title="删除线 (Ctrl+Shift+S)"><s>S</s></button>
+                <button onclick="insertMd('code')" title="行内代码 (Ctrl+`)"><code>`</code></button>
                 <div class="divider"></div>
-                <button onclick="insertMd('ul')">● 无序</button>
-                <button onclick="insertMd('ol')">1. 有序</button>
-                <button onclick="insertMd('quote')">💬 引用</button>
+                <button onclick="insertMd('ul')" title="无序列表">● 列表</button>
+                <button onclick="insertMd('ol')" title="有序列表">1. 列表</button>
+                <button onclick="insertMd('task')" title="待办列表">☑️ 待办</button>
                 <div class="divider"></div>
-                <button onclick="insertMd('notice')">💡 卡片</button>
-                <button onclick="insertMd('task')">☑️ 待办</button>
-                <button onclick="insertMd('table')">📊 表格</button>
-                <button onclick="insertMd('link')">🔗 链接</button>
-                <button onclick="document.getElementById('file-upload').click()">🖼️ 插图</button>
+                <button onclick="insertMd('quote')" title="引用块">💬 引用</button>
+                <button onclick="insertMd('notice')" title="高亮卡片">💡 卡片</button>
+                <button onclick="insertMd('table')" title="插入表格">📊 表格</button>
                 <div class="divider"></div>
-                <button onclick="insertMd('codeblock')">📝 代码块</button>
-                <button onclick="insertMd('math')" title="数学公式">∑ 公式</button>
-                <button onclick="insertMd('toc')" title="生成目录">📑 目录</button>
-                <button onclick="insertMd('pagebreak')" style="color: #ec4899;">✂️ 换页</button>
+                <button onclick="insertMd('link')" title="链接 (Ctrl+K)">🔗 链接</button>
+                <button onclick="insertMd('image')" title="图片标记">🖼️ 图标</button>
+                <button onclick="document.getElementById('file-upload').click()" title="上传图片">📤 上传</button>
+                <div class="divider"></div>
+                <button onclick="insertMd('codeblock')" title="代码块">📝 代码</button>
+                <button onclick="insertMd('math')" title="数学公式 (Ctrl+Shift+M)">∑ 公式</button>
+                <button onclick="insertMd('hr')" title="分隔线">───</button>
+                <button onclick="insertMd('pagebreak')" style="color: #ec4899;" title="分页">✂️ 分页</button>
             </div>
             
             <textarea id="md-input" placeholder="开始您的创作... (排版样式设置已移至右侧预览区顶部)"></textarea>
@@ -602,54 +610,121 @@
             const startPos = mdInput.selectionStart;
             const endPos = mdInput.selectionEnd;
             const text = mdInput.value;
-            const selectedText = text.substring(startPos, endPos);
-            let replacement = '';
-            let newCursorPos = 0;
-
-            if (type === 'bold') { replacement = `**${selectedText || '加粗文字'}**`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'italic') { replacement = `*${selectedText || '斜体文字'}*`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'strikethrough') { replacement = `~~${selectedText || '删除文字'}~~`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'code') { replacement = `\`${selectedText || '代码'}\``; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'codeblock') { replacement = `\n\`\`\`${selectedText ? selectedText : 'javascript\nconsole.log("Hello World");'}\n\`\`\`\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h1') { replacement = `\n# ${selectedText || '输入一级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h2') { replacement = `\n## ${selectedText || '输入二级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h3') { replacement = `\n### ${selectedText || '输入三级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'quote') { replacement = `\n> ${selectedText || '引用内容'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'notice') { replacement = `\n>! ${selectedText || '在这里输入高亮重点内容...'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'task') { replacement = `\n- [ ] ${selectedText || '待办事项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'ul') { replacement = `\n- ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'ol') { replacement = `\n1. ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'link') { replacement = `[${selectedText || '链接文字'}](https://example.com)`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'table') { replacement = `\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'math') { replacement = `\n$$ ${selectedText || 'a^2 + b^2 = c^2'} $$\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'toc') { replacement = `\n## 目录\n\n[跳转到内容](#内容)\n\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'pagebreak') { replacement = `\n\n---\n\n`; newCursorPos = startPos + replacement.length; }
-
+            let selectedText = text.substring(startPos, endPos);
+            
+            let beforeText = '';
+            let afterText = '';
+            let placeholder = '';
+            
+            switch (type) {
+                case 'bold':
+                    beforeText = '**';
+                    afterText = '**';
+                    placeholder = '加粗文字';
+                    break;
+                case 'italic':
+                    beforeText = '*';
+                    afterText = '*';
+                    placeholder = '斜体文字';
+                    break;
+                case 'strikethrough':
+                    beforeText = '~~';
+                    afterText = '~~';
+                    placeholder = '删除文字';
+                    break;
+                case 'code':
+                    beforeText = '`';
+                    afterText = '`';
+                    placeholder = '代码';
+                    break;
+                case 'codeblock':
+                    beforeText = '\n```javascript\n';
+                    afterText = '\n```\n';
+                    placeholder = 'console.log("Hello World");';
+                    break;
+                case 'h1':
+                    beforeText = '\n# ';
+                    afterText = '\n';
+                    placeholder = '输入一级标题';
+                    break;
+                case 'h2':
+                    beforeText = '\n## ';
+                    afterText = '\n';
+                    placeholder = '输入二级标题';
+                    break;
+                case 'h3':
+                    beforeText = '\n### ';
+                    afterText = '\n';
+                    placeholder = '输入三级标题';
+                    break;
+                case 'quote':
+                    beforeText = '\n> ';
+                    afterText = '\n';
+                    placeholder = '引用内容';
+                    break;
+                case 'notice':
+                    beforeText = '\n>! ';
+                    afterText = '\n';
+                    placeholder = '在这里输入高亮重点内容...';
+                    break;
+                case 'task':
+                    beforeText = '\n- [ ] ';
+                    afterText = '';
+                    placeholder = '待办事项';
+                    break;
+                case 'ul':
+                    beforeText = '\n- ';
+                    afterText = '';
+                    placeholder = '列表项';
+                    break;
+                case 'ol':
+                    beforeText = '\n1. ';
+                    afterText = '';
+                    placeholder = '列表项';
+                    break;
+                case 'link':
+                    beforeText = '[';
+                    afterText = '](https://example.com)';
+                    placeholder = '链接文字';
+                    break;
+                case 'image':
+                    beforeText = '![图片描述](';
+                    afterText = ')';
+                    placeholder = 'https://example.com/image.jpg';
+                    break;
+                case 'table':
+                    beforeText = '\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n';
+                    afterText = '';
+                    placeholder = '';
+                    break;
+                case 'math':
+                    beforeText = '\n$$ ';
+                    afterText = ' $$\n';
+                    placeholder = 'a^2 + b^2 = c^2';
+                    break;
+                case 'pagebreak':
+                    beforeText = '\n\n---\n\n';
+                    afterText = '';
+                    placeholder = '';
+                    break;
+                case 'hr':
+                    beforeText = '\n\n---\n\n';
+                    afterText = '';
+                    placeholder = '';
+                    break;
+            }
+            
+            const contentText = selectedText || placeholder;
+            const replacement = beforeText + contentText + afterText;
+            
             mdInput.value = text.substring(0, startPos) + replacement + text.substring(endPos);
             
-            if (!selectedText && ['bold','italic','strikethrough','code','codeblock','h1','h2','h3','notice','task','ul','ol','quote','link','math','toc'].includes(type)) {
-                let offsetStart = 0, offsetEnd = 0;
-                if(type === 'bold') { offsetStart = 2; offsetEnd = 4; }
-                if(type === 'italic') { offsetStart = 1; offsetEnd = 3; }
-                if(type === 'strikethrough') { offsetStart = 2; offsetEnd = 4; }
-                if(type === 'code') { offsetStart = 1; offsetEnd = 3; }
-                if(type === 'codeblock') { offsetStart = 4; offsetEnd = 10; }
-                if(type === 'h1') { offsetStart = 3; offsetEnd = 6; }
-                if(type === 'h2') { offsetStart = 4; offsetEnd = 6; }
-                if(type === 'h3') { offsetStart = 5; offsetEnd = 6; }
-                if(type === 'quote') { offsetStart = 3; offsetEnd = 4; }
-                if(type === 'notice') { offsetStart = 4; offsetEnd = 14; }
-                if(type === 'task') { offsetStart = 7; offsetEnd = 4; }
-                if(type === 'ul') { offsetStart = 3; offsetEnd = 3; }
-                if(type === 'ol') { offsetStart = 4; offsetEnd = 3; }
-                if(type === 'link') { offsetStart = 1; offsetEnd = 10; }
-                if(type === 'math') { offsetStart = 4; offsetEnd = 15; }
-                if(type === 'toc') { offsetStart = 7; offsetEnd = 10; }
-                mdInput.selectionStart = startPos + offsetStart;
-                mdInput.selectionEnd = startPos + offsetStart + offsetEnd;
+            if (!selectedText) {
+                mdInput.selectionStart = startPos + beforeText.length;
+                mdInput.selectionEnd = startPos + beforeText.length + contentText.length;
             } else {
-                mdInput.selectionStart = newCursorPos;
-                mdInput.selectionEnd = newCursorPos;
+                mdInput.selectionStart = startPos + replacement.length;
+                mdInput.selectionEnd = startPos + replacement.length;
             }
 
             mdInput.dispatchEvent(new Event('input'));
@@ -846,8 +921,23 @@
         
         mdInput.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
+                // 基础快捷键
                 if (e.key === 'z') { e.preventDefault(); undo(); } 
                 else if (e.key === 'y') { e.preventDefault(); redo(); }
+                // 格式化快捷键
+                else if (e.key === 'b') { e.preventDefault(); insertMd('bold'); }
+                else if (e.key === 'i') { e.preventDefault(); insertMd('italic'); }
+                else if (e.key === 'k') { e.preventDefault(); insertMd('link'); }
+                else if (e.key === '`') { e.preventDefault(); insertMd('code'); }
+                // 标题快捷键
+                else if (e.key === '1') { e.preventDefault(); insertMd('h1'); }
+                else if (e.key === '2') { e.preventDefault(); insertMd('h2'); }
+                else if (e.key === '3') { e.preventDefault(); insertMd('h3'); }
+                // Shift+ 组合键
+                else if (e.shiftKey) {
+                    if (e.key === 's') { e.preventDefault(); insertMd('strikethrough'); }
+                    else if (e.key === 'm') { e.preventDefault(); insertMd('math'); }
+                }
             }
         });
 
