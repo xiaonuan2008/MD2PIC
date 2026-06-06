@@ -59,47 +59,6 @@
             to { transform: translateX(100%); opacity: 0; }
         }
         
-        @keyframes toastSlideIn {
-            from { transform: translateY(-100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
-        @keyframes toastSlideOut {
-            from { transform: translateY(0); opacity: 1; }
-            to { transform: translateY(-100%); opacity: 0; }
-        }
-        
-        /* Toast 提示 */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .toast {
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: toastSlideIn 0.3s ease;
-            max-width: 300px;
-        }
-        
-        .toast.success { background: #10b981; }
-        .toast.error { background: #ef4444; }
-        .toast.info { background: #0ea5e9; }
-        .toast.warning { background: #f59e0b; }
-        
-        .toast.hiding {
-            animation: toastSlideOut 0.3s ease forwards;
-        }
-        
         /* 顶部极简工具栏 */
         .header { background: #ffffff; padding: 12px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; z-index: 10; flex-shrink: 0;}
         .header-left { display: flex; align-items: center; gap: 10px; }
@@ -328,7 +287,7 @@
 
     <div class="header">
         <div class="header-left">
-            <h1>排版记事本 <span>V15 沉浸预览</span></h1>
+            <h1>排版记事本 <span>V16 智能分页</span></h1>
         </div>
         <div class="header-right">
             <button id="export-btn" class="export-btn" onclick="exportImages()">保存大图</button>
@@ -483,9 +442,6 @@
     </div>
 
     <div id="hidden-staging" style="display: none;"></div>
-    
-    <!-- Toast 提示容器 -->
-    <div id="toast-container" class="toast-container"></div>
 
     <script>
         // ==========================================
@@ -535,12 +491,7 @@
                 req.onsuccess = () => {
                     const keys = req.result;
                     keys.forEach(key => {
-                        // 使用更精确的匹配：检查是否存在 ![...](key) 格式的引用
-                        // 避免 key 是另一个 key 的前缀时被误删
-                        const pattern = new RegExp(`!\\[[^\\]]*\\]\\(${key}\\)`, 'g');
-                        if (!pattern.test(currentText)) {
-                            store.delete(key);
-                        }
+                        if (!currentText.includes(key)) store.delete(key);
                     });
                     resolve();
                 };
@@ -548,31 +499,10 @@
         }
 
         // ==========================================
-        // Toast 提示功能
-        // ==========================================
-        function showToast(message, type = 'info', duration = 3000) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('hiding');
-                setTimeout(() => {
-                    if (container.contains(toast)) {
-                        container.removeChild(toast);
-                    }
-                }, 300);
-            }, duration);
-        }
-
-        // ==========================================
         // 第二部分：界面交互与配置
         // ==========================================
         const CONFIG_KEY = 'md_config';
         const DRAFT_KEY = 'md_draft';
-        const CLEARED_CONTENT_KEY = 'md_cleared_content';
 
         const themeSelect = document.getElementById('theme-select');
         const ratioSelect = document.getElementById('ratio-select');
@@ -609,7 +539,7 @@
         let isHistoryTraversing = false;
 
         // 默认文本
-        const defaultText = `# 🎉 V15 沉浸交互版\n\n现在，左侧彻底变成了清爽的打字机，右侧则是你的全能画布！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的“设置工具（主题/字号等）”都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置`;
+        const defaultText = `# 🎉 V16 智能分页版\n\n现在，分页算法已优化，再也不会丢失内容了！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的"设置工具（主题/字号等）"都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置\n- [x] 智能分页，内容不再丢失`;
 
         marked.setOptions({ breaks: true, gfm: true });
         if (typeof markedKatex !== 'undefined') marked.use(markedKatex({ throwOnError: false }));
@@ -638,12 +568,8 @@
                 historyStack = historyStack.slice(0, historyIndex + 1);
             }
             historyStack.push(text);
-            if (historyStack.length > 50) {
-                historyStack.shift();
-                // 当超出限制时，historyIndex保持不变，因为我们移除了最早的一条
-            } else {
-                historyIndex++;
-            }
+            if (historyStack.length > 50) historyStack.shift(); 
+            else historyIndex++;
             updateUndoRedoButtons();
         }
 
@@ -872,42 +798,46 @@
                 if(config.lineHeight) { lineHeightRange.value = config.lineHeight; root.style.setProperty('--base-line-height', config.lineHeight); }
                 if(config.textAlign) { textAlignSelect.value = config.textAlign; root.style.setProperty('--text-align', config.textAlign); }
             }
-            
-            // 加载是否有可恢复的内容
-            const savedClearedContent = await dbGet('data', CLEARED_CONTENT_KEY);
-            if (savedClearedContent && savedClearedContent.trim() !== '') {
-                lastClearedContent = savedClearedContent;
-                btnRestore.style.display = 'inline-flex';
-            }
-            
             saveHistory(mdInput.value); 
             triggerRender();
         }
 
-        btnClear.addEventListener('click', async () => {
+        btnClear.addEventListener('click', () => {
             if(mdInput.value.trim() === '') return; 
             // 移除confirm弹窗，直接清空内容
             lastClearedContent = mdInput.value; 
-            await dbSet('data', CLEARED_CONTENT_KEY, lastClearedContent); 
             mdInput.value = ''; 
             btnRestore.style.display = 'inline-flex'; 
             triggerRender(); 
             saveConfigAndDraft(); 
             saveHistory(''); 
-            // 使用Toast提示
-            showToast('内容已清空，可点击"恢复"按钮找回', 'success');
+            // 显示清空提示
+            const clearHint = document.createElement('div');
+            clearHint.textContent = '内容已清空，可点击"恢复"按钮找回';
+            clearHint.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(clearHint);
+            setTimeout(() => {
+                clearHint.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => document.body.removeChild(clearHint), 300);
+            }, 3000);
         });
 
-        btnRestore.addEventListener('click', async () => {
+        btnRestore.addEventListener('click', () => {
             if(lastClearedContent) {
-                mdInput.value = lastClearedContent; 
-                lastClearedContent = ''; 
-                await dbSet('data', CLEARED_CONTENT_KEY, ''); 
+                mdInput.value = lastClearedContent; lastClearedContent = ''; 
                 btnRestore.style.display = 'none'; 
-                triggerRender(); 
-                saveConfigAndDraft(); 
-                saveHistory(mdInput.value); 
-                showToast('内容已恢复', 'success');
+                triggerRender(); saveConfigAndDraft(); saveHistory(mdInput.value); 
             }
         });
 
@@ -1029,64 +959,49 @@
             if (isRendering) return;
             isRendering = true;
             try {
-                try {
-                    // 1. 基础 Markdown 解析
-                    hiddenStaging.innerHTML = marked.parse(mdInput.value);
+                // 1. 基础 Markdown 解析
+                hiddenStaging.innerHTML = marked.parse(mdInput.value);
 
-                    // 2. 解析后处理网感组件
-                    const blockquotes = hiddenStaging.querySelectorAll('blockquote');
-                    blockquotes.forEach(bq => {
-                        const firstP = bq.querySelector('p');
-                        if (firstP) {
-                            let text = firstP.innerHTML;
-                            if (text.match(/^[!！]\s?/)) {
-                                bq.classList.add('notice-box');
-                                firstP.innerHTML = text.replace(/^[!！]\s?/, '');
-                            }
+                // 2. 解析后处理网感组件
+                const blockquotes = hiddenStaging.querySelectorAll('blockquote');
+                blockquotes.forEach(bq => {
+                    const firstP = bq.querySelector('p');
+                    if (firstP) {
+                        let text = firstP.innerHTML;
+                        if (text.match(/^[!！]\s?/)) {
+                            bq.classList.add('notice-box');
+                            firstP.innerHTML = text.replace(/^[!！]\s?/, '');
                         }
-                    });
+                    }
+                });
 
-                    const uls = hiddenStaging.querySelectorAll('ul');
-                    uls.forEach(ul => {
-                        if (ul.querySelector('input[type="checkbox"]')) {
-                            ul.classList.add('contains-task-list');
-                            const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
-                            checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
+                const uls = hiddenStaging.querySelectorAll('ul');
+                uls.forEach(ul => {
+                    if (ul.querySelector('input[type="checkbox"]')) {
+                        ul.classList.add('contains-task-list');
+                        const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
+                        checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
+                    }
+                });
+
+                // 3. 异步处理图片
+                const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
+                const loadPromises = imgs.map(img => {
+                    return new Promise(async (resolve) => {
+                        let src = img.getAttribute('src');
+                        if (src && src.startsWith('local_img_')) {
+                            const realBase64 = await dbGet('images', src);
+                            if (realBase64) img.src = realBase64;
+                            else img.alt = '⚠️ 图片已失效';
                         }
+                        if (img.complete) resolve();
+                        else { img.onload = resolve; img.onerror = resolve; }
                     });
-
-                    // 3. 异步处理图片
-                    const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
-                    const loadPromises = imgs.map(img => {
-                        return new Promise(async (resolve) => {
-                            let src = img.getAttribute('src');
-                            if (src && src.startsWith('local_img_')) {
-                                const realBase64 = await dbGet('images', src);
-                                if (realBase64) img.src = realBase64;
-                                else img.alt = '⚠️ 图片已失效';
-                            }
-                            if (img.complete) resolve();
-                            else { img.onload = resolve; img.onerror = resolve; }
-                        });
-                    });
-                    await Promise.all(loadPromises);
-                    
-                    // 4. 执行智能分页
-                    paginateNodes();
-                } catch (error) {
-                    console.error('渲染出错:', error);
-                    // 显示错误提示给用户
-                    scaleWrapper.innerHTML = `
-                        <div style="padding: 40px; text-align: center; color: #666;">
-                            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-                            <h3 style="margin: 0 0 10px 0;">渲染出错</h3>
-                            <p style="margin: 0 0 20px 0;">${error.message || '请检查您的输入内容'}</p>
-                            <button onclick="location.reload()" style="padding: 10px 20px; background: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                                重置页面
-                            </button>
-                        </div>
-                    `;
-                }
+                });
+                await Promise.all(loadPromises);
+                
+                // 4. 执行智能分页
+                paginateNodes();
             } finally {
                 isRendering = false;
             }
@@ -1130,7 +1045,13 @@
             let current = createNewPage(pageIndex);
             scaleWrapper.appendChild(current.page);
 
-            let queue = Array.from(hiddenStaging.childNodes);
+            // ★ 修复：使用 cloneNode 克隆节点，避免操作原始 DOM 节点导致内容丢失
+            let queue = [];
+            hiddenStaging.childNodes.forEach(node => {
+                if (node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim() !== '')) {
+                    queue.push(node.cloneNode(true));
+                }
+            });
 
             while (queue.length > 0) {
                 let node = queue.shift();
@@ -1280,41 +1201,37 @@
                 let zip = null;
                 if (isZip) { zip = new JSZip(); } 
 
-                // 创建临时渲染容器（不移到视口外）
-                const tempContainer = document.createElement('div');
-                tempContainer.style.cssText = `
-                    position: fixed;
-                    left: 0;
-                    top: 0;
-                    z-index: -9999;
-                    opacity: 0;
-                    pointer-events: none;
-                `;
-                document.body.appendChild(tempContainer);
-
                 for (let i = 0; i < pages.length; i++) {
                     const page = pages[i];
                     
-                    // 获取用户指定的固定尺寸
+                    // 获取当前页面的内容元素
+                    const contentElement = page.querySelector('.page-content');
+                    const footerElement = page.querySelector('.page-footer');
+                    
+                    if (!contentElement || !footerElement) {
+                        console.warn(`页面 ${i + 1} 缺少必要的元素，跳过处理`);
+                        continue;
+                    }
+                    
+                    // 保持用户指定的固定尺寸
                     const pageWidth = parseInt(getComputedStyle(root).getPropertyValue('--page-width'));
                     const pageHeight = parseInt(getComputedStyle(root).getPropertyValue('--page-height'));
                     
-                    // 克隆节点到临时容器
-                    const clone = page.cloneNode(true);
-                    clone.style.width = pageWidth + 'px';
-                    clone.style.height = pageHeight + 'px';
-                    clone.style.position = 'relative';
-                    clone.style.left = '0';
-                    clone.style.top = '0';
-                    clone.style.margin = '0';
-                    tempContainer.appendChild(clone);
+                    // 直接使用原始页面进行捕获，避免克隆可能带来的跨域问题
+                    const originalPosition = page.style.position;
+                    const originalLeft = page.style.left;
+                    const originalTop = page.style.top;
                     
-                    // 等待字体渲染（确保特殊字体正确显示）
-                    await document.fonts.ready;
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // 临时移动页面到可视区域外进行捕获
+                    page.style.position = 'absolute';
+                    page.style.left = '-9999px';
+                    page.style.top = '-9999px';
+                    page.style.width = pageWidth + 'px';
+                    page.style.height = pageHeight + 'px';
+                    page.style.overflow = 'hidden';
                     
-                    // 捕获克隆页面
-                    const canvas = await html2canvas(clone, {
+                    // 捕获原始页面
+                    const canvas = await html2canvas(page, {
                         scale: 2,
                         useCORS: true,
                         backgroundColor: currentBgColor,
@@ -1323,39 +1240,40 @@
                         height: pageHeight,
                         x: 0,
                         y: 0,
+                        // 增加超时设置
                         timeout: 30000,
+                        // 尝试使用不同的渲染方法
                         allowTaint: true,
                         foreignObjectRendering: false
                     });
                     
-                    // 清理克隆节点
-                    tempContainer.removeChild(clone);
+                    // 恢复页面原始位置
+                    page.style.position = originalPosition;
+                    page.style.left = originalLeft;
+                    page.style.top = originalTop;
+                    page.style.width = '';
+                    page.style.height = '';
+                    page.style.overflow = '';
                     
                     const base64Data = canvas.toDataURL('image/png');
                     
                     if (isZip) {
                         const pureBase64 = base64Data.split(',')[1];
                         zip.file(`图文_P${i + 1}.png`, pureBase64, {base64: true});
-                        // 更新进度提示
-                        exportBtn.innerText = `正在生成... ${i + 1}/${pages.length}`;
                     } else {
                         const link = document.createElement('a');
                         link.download = `图文内容.png`;
                         link.href = base64Data;
                         link.click();
                     }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 150));
                 }
-
-                // 清理临时容器
-                document.body.removeChild(tempContainer);
 
                 if (isZip) {
                     exportBtn.innerText = '压缩打包...';
                     const content = await zip.generateAsync({type:"blob"});
                     saveAs(content, "高清图文合集.zip");
-                    showToast(`成功导出 ${pages.length} 张图片并打包`, 'success');
-                } else {
-                    showToast('图片导出成功', 'success');
                 }
 
             } catch (error) {
@@ -1378,9 +1296,18 @@
                 
                 errorMessage += "\n\n建议：使用本地上传的图片，或更换其他图片来源。";
                 
-                showToast('导出失败，请查看提示', 'error');
                 alert(errorMessage);
             } finally {
+                // 确保恢复页面原始状态
+                pages.forEach(page => {
+                    page.style.position = '';
+                    page.style.left = '';
+                    page.style.top = '';
+                    page.style.width = '';
+                    page.style.height = '';
+                    page.style.overflow = '';
+                });
+                
                 scaleWrapper.style.transform = originalTransform;
                 updateExportBtnText();
                 exportBtn.disabled = false;
