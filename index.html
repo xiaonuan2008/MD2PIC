@@ -287,7 +287,7 @@
 
     <div class="header">
         <div class="header-left">
-            <h1>排版记事本 <span>V15 沉浸预览</span></h1>
+            <h1>排版记事本 <span>V16 智能分页</span></h1>
         </div>
         <div class="header-right">
             <button id="export-btn" class="export-btn" onclick="exportImages()">保存大图</button>
@@ -539,7 +539,7 @@
         let isHistoryTraversing = false;
 
         // 默认文本
-        const defaultText = `# 🎉 V15 沉浸交互版\n\n现在，左侧彻底变成了清爽的打字机，右侧则是你的全能画布！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的“设置工具（主题/字号等）”都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置`;
+        const defaultText = `# 🎉 V16 智能分页版\n\n现在，分页算法已优化，再也不会丢失内容了！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的"设置工具（主题/字号等）"都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置\n- [x] 智能分页，内容不再丢失`;
 
         marked.setOptions({ breaks: true, gfm: true });
         if (typeof markedKatex !== 'undefined') marked.use(markedKatex({ throwOnError: false }));
@@ -1045,7 +1045,13 @@
             let current = createNewPage(pageIndex);
             scaleWrapper.appendChild(current.page);
 
-            let queue = Array.from(hiddenStaging.childNodes);
+            // ★ 修复：使用 cloneNode 克隆节点，避免操作原始 DOM 节点导致内容丢失
+            let queue = [];
+            hiddenStaging.childNodes.forEach(node => {
+                if (node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim() !== '')) {
+                    queue.push(node.cloneNode(true));
+                }
+            });
 
             while (queue.length > 0) {
                 let node = queue.shift();
