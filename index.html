@@ -673,57 +673,161 @@
         // Markdown 快捷操作
         function insertMd(type) {
             mdInput.focus();
-            const startPos = mdInput.selectionStart;
-            const endPos = mdInput.selectionEnd;
+            let startPos = mdInput.selectionStart;
+            let endPos = mdInput.selectionEnd;
             const text = mdInput.value;
-            const selectedText = text.substring(startPos, endPos);
-            let replacement = '';
-            let newCursorPos = 0;
+            let selectedText = text.substring(startPos, endPos);
+            let targetText = selectedText;
+            let targetStart = startPos;
+            let targetEnd = endPos;
 
-            if (type === 'bold') { replacement = `**${selectedText || '加粗文字'}**`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'italic') { replacement = `*${selectedText || '斜体文字'}*`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'strikethrough') { replacement = `~~${selectedText || '删除文字'}~~`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'code') { replacement = `\`${selectedText || '代码'}\``; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'codeblock') { replacement = `\n\`\`\`${selectedText ? selectedText : 'javascript\nconsole.log("Hello World");'}\n\`\`\`\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h1') { replacement = `\n# ${selectedText || '输入一级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h2') { replacement = `\n## ${selectedText || '输入二级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'h3') { replacement = `\n### ${selectedText || '输入三级标题'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'quote') { replacement = `\n> ${selectedText || '引用内容'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'notice') { replacement = `\n>! ${selectedText || '在这里输入高亮重点内容...'}\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'task') { replacement = `\n- [ ] ${selectedText || '待办事项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'ul') { replacement = `\n- ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'ol') { replacement = `\n1. ${selectedText || '列表项'}`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'link') { replacement = `[${selectedText || '链接文字'}](https://example.com)`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'table') { replacement = `\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'math') { replacement = `\n$$ ${selectedText || 'a^2 + b^2 = c^2'} $$\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'toc') { replacement = `\n## 目录\n\n[跳转到内容](#内容)\n\n`; newCursorPos = startPos + replacement.length; } 
-            else if (type === 'pagebreak') { replacement = `\n\n---\n\n`; newCursorPos = startPos + replacement.length; }
+            // 如果没有选中文字，根据格式类型智能选择
+            if (!selectedText) {
+                // 块级格式：选中光标所在的整行
+                if (['h1', 'h2', 'h3', 'quote', 'notice', 'task', 'ul', 'ol'].includes(type)) {
+                    // 找到当前行的起始和结束位置
+                    let lineStart = text.lastIndexOf('\n', startPos - 1) + 1;
+                    let lineEnd = text.indexOf('\n', startPos);
+                    lineEnd = lineEnd === -1 ? text.length : lineEnd;
+                    
+                    targetText = text.substring(lineStart, lineEnd).trim();
+                    targetStart = lineStart;
+                    targetEnd = lineEnd;
+                }
+                // 行内格式：选中光标附近的单词或文字
+                else if (['bold', 'italic', 'strikethrough', 'code', 'link'].includes(type)) {
+                    // 简单方法：直接使用占位符，或者扩展选择范围
+                    // 优先尝试选择光标附近的单词
+                    let wordStart = startPos;
+                    let wordEnd = endPos;
+                    
+                    // 向前查找非单词字符
+                    while (wordStart > 0 && /[\u4e00-\u9fa5\w]/.test(text[wordStart - 1])) {
+                        wordStart--;
+                    }
+                    // 向后查找非单词字符
+                    while (wordEnd < text.length && /[\u4e00-\u9fa5\w]/.test(text[wordEnd])) {
+                        wordEnd++;
+                    }
+                    
+                    if (wordEnd > wordStart) {
+                        targetText = text.substring(wordStart, wordEnd);
+                        targetStart = wordStart;
+                        targetEnd = wordEnd;
+                    }
+                }
+            }
 
-            mdInput.value = text.substring(0, startPos) + replacement + text.substring(endPos);
-            
-            if (!selectedText && ['bold','italic','strikethrough','code','codeblock','h1','h2','h3','notice','task','ul','ol','quote','link','math','toc'].includes(type)) {
-                let offsetStart = 0, offsetEnd = 0;
-                if(type === 'bold') { offsetStart = 2; offsetEnd = 4; }
-                if(type === 'italic') { offsetStart = 1; offsetEnd = 3; }
-                if(type === 'strikethrough') { offsetStart = 2; offsetEnd = 4; }
-                if(type === 'code') { offsetStart = 1; offsetEnd = 3; }
-                if(type === 'codeblock') { offsetStart = 4; offsetEnd = 10; }
-                if(type === 'h1') { offsetStart = 3; offsetEnd = 6; }
-                if(type === 'h2') { offsetStart = 4; offsetEnd = 6; }
-                if(type === 'h3') { offsetStart = 5; offsetEnd = 6; }
-                if(type === 'quote') { offsetStart = 3; offsetEnd = 4; }
-                if(type === 'notice') { offsetStart = 4; offsetEnd = 14; }
-                if(type === 'task') { offsetStart = 7; offsetEnd = 4; }
-                if(type === 'ul') { offsetStart = 3; offsetEnd = 3; }
-                if(type === 'ol') { offsetStart = 4; offsetEnd = 3; }
-                if(type === 'link') { offsetStart = 1; offsetEnd = 10; }
-                if(type === 'math') { offsetStart = 4; offsetEnd = 15; }
-                if(type === 'toc') { offsetStart = 7; offsetEnd = 10; }
-                mdInput.selectionStart = startPos + offsetStart;
-                mdInput.selectionEnd = startPos + offsetStart + offsetEnd;
+            let beforeText = '';
+            let afterText = '';
+            let placeholder = '';
+
+            switch (type) {
+                case 'bold':
+                    beforeText = '**';
+                    afterText = '**';
+                    placeholder = '加粗文字';
+                    break;
+                case 'italic':
+                    beforeText = '*';
+                    afterText = '*';
+                    placeholder = '斜体文字';
+                    break;
+                case 'strikethrough':
+                    beforeText = '~~';
+                    afterText = '~~';
+                    placeholder = '删除文字';
+                    break;
+                case 'code':
+                    beforeText = '`';
+                    afterText = '`';
+                    placeholder = '代码';
+                    break;
+                case 'codeblock':
+                    beforeText = '\n```javascript\n';
+                    afterText = '\n```\n';
+                    placeholder = 'console.log("Hello World");';
+                    break;
+                case 'h1':
+                    beforeText = '# ';
+                    afterText = '';
+                    placeholder = '输入一级标题';
+                    break;
+                case 'h2':
+                    beforeText = '## ';
+                    afterText = '';
+                    placeholder = '输入二级标题';
+                    break;
+                case 'h3':
+                    beforeText = '### ';
+                    afterText = '';
+                    placeholder = '输入三级标题';
+                    break;
+                case 'quote':
+                    beforeText = '> ';
+                    afterText = '';
+                    placeholder = '引用内容';
+                    break;
+                case 'notice':
+                    beforeText = '>! ';
+                    afterText = '';
+                    placeholder = '在这里输入高亮重点内容...';
+                    break;
+                case 'task':
+                    beforeText = '- [ ] ';
+                    afterText = '';
+                    placeholder = '待办事项';
+                    break;
+                case 'ul':
+                    beforeText = '- ';
+                    afterText = '';
+                    placeholder = '列表项';
+                    break;
+                case 'ol':
+                    beforeText = '1. ';
+                    afterText = '';
+                    placeholder = '列表项';
+                    break;
+                case 'link':
+                    beforeText = '[';
+                    afterText = '](https://example.com)';
+                    placeholder = '链接文字';
+                    break;
+                case 'image':
+                    beforeText = '![图片描述](';
+                    afterText = ')';
+                    placeholder = 'https://example.com/image.jpg';
+                    break;
+                case 'table':
+                    beforeText = '\n| 表头1 | 表头2 | 表头3 |\n| :--- | :--- | :--- |\n';
+                    afterText = '\n| 内容 | 内容 | 内容 |\n';
+                    placeholder = '';
+                    break;
+                case 'math':
+                    beforeText = '$$ ';
+                    afterText = ' $$';
+                    placeholder = 'a^2 + b^2 = c^2';
+                    break;
+                case 'pagebreak':
+                case 'hr':
+                    beforeText = '\n\n---\n\n';
+                    afterText = '';
+                    placeholder = '';
+                    break;
+            }
+
+            const contentText = targetText || placeholder;
+            const replacement = beforeText + contentText + afterText;
+
+            mdInput.value = text.substring(0, targetStart) + replacement + text.substring(targetEnd);
+
+            // 光标定位
+            if (!targetText) {
+                mdInput.selectionStart = targetStart + beforeText.length;
+                mdInput.selectionEnd = targetStart + beforeText.length + contentText.length;
             } else {
-                mdInput.selectionStart = newCursorPos;
-                mdInput.selectionEnd = newCursorPos;
+                mdInput.selectionStart = targetStart + replacement.length;
+                mdInput.selectionEnd = targetStart + replacement.length;
             }
 
             mdInput.dispatchEvent(new Event('input'));
