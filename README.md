@@ -1,1 +1,145 @@
-# MD2PIC
+# MD2PIC - 图文排版记事本 ✨
+
+一款免费开源的纯前端图文排版工具，支持 Markdown 语法、多主题切换、自动分页、一键生成并打包高清长图，专为小红书等自媒体创作者打造。
+
+**版本**: v1.1.0  
+**发布日期**: 2026-06-01
+
+---
+
+## 🚀 快速开始
+
+### 方式 1: 本地运行
+**无需安装！无需配置！**
+直接双击打开 [`index.html`](index.html) 即可使用 ✨
+
+### 方式 2: Cloudflare Pages 部署
+详细步骤请查看 [`DEPLOYMENT.md`](DEPLOYMENT.md)
+
+---
+
+## ✨ 核心功能
+
+### 📝 编辑功能
+- ✅ Markdown 语法支持
+- ✅ 快捷工具栏（标题/粗体/斜体/代码/列表/引用等）
+- ✅ 撤销/重做（Ctrl+Z / Ctrl+Y）
+- ✅ 图片上传/粘贴
+- ✅ 自动保存到本地
+- ✅ 清空/恢复功能
+
+### 🎨 排版定制
+- ✅ **4 套精美主题**
+  - 小红书风（默认）
+  - 极简高冷
+  - 学术严谨
+  - 可爱手帐
+- ✅ **15+ 种字体**（思源黑体/宋体/站酷字体等）
+- ✅ **3 种画布尺寸**
+  - 3:4 长图（小红书推荐）
+  - 1:1 方图
+  - 9:16 全屏
+- ✅ 字号/行距滑块调节
+- ✅ 背景色自定义
+- ✅ 4 种文本对齐方式
+- ✅ 多种列表样式
+- ✅ 水印设置
+- ✅ 封面模式
+
+### 📄 智能分页
+- ✅ 自动检测内容溢出
+- ✅ 智能段落拆分
+- ✅ `---` 强制分页
+
+### 💾 一键导出
+- ✅ 单图导出（PNG，2x 高清）
+- ✅ 多图打包（ZIP）
+- ✅ 自动命名
+- ✅ 导出进度提示
+
+### 📱 完美适配
+- ✅ 桌面端分屏操作
+- ✅ 移动端沉浸体验
+- ✅ 响应式布局
+
+---
+
+## 📖 特殊语法
+
+### 1. 高亮提示框
+```markdown
+>! 这是高亮提示内容！
+```
+
+### 2. 任务列表
+```markdown
+- [x] 已完成的任务
+- [ ] 待办事项
+```
+
+### 3. 数学公式（KaTeX）
+```markdown
+$$ a^2 + b^2 = c^2 $$
+```
+
+### 4. 强制分页
+```markdown
+---
+```
+
+---
+
+## 📁 项目文档
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Cloudflare Pages 部署指南
+- [docs/CODE_WIKI.md](docs/CODE_WIKI.md) - 完整代码 Wiki 文档（架构/模块/函数说明）
+- [docs/TEST_REPORT.md](docs/TEST_REPORT.md) - 测试报告
+- [docs/ANALYSIS_REPORT.md](docs/ANALYSIS_REPORT.md) - 深度分析与改进建议
+- [docs/FIXES_SUMMARY.md](docs/FIXES_SUMMARY.md) - 已修复问题总结
+- [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) - 项目目录结构设计
+- [docs/ROADMAP.md](docs/ROADMAP.md) - 更新迭代计划
+- [docs/VERSION_v1.1.0.md](docs/VERSION_v1.1.0.md) - v1.1.0 更新日志
+
+---
+
+## 🎯 v1.1.0 更新内容
+
+### 新特性
+- ✅ 撤销/重做功能优化（50条历史记录）
+- ✅ 图片清理逻辑更安全（正则精确匹配）
+- ✅ 渲染错误边界（友好提示+重置按钮）
+- ✅ 导出一致性优化（预览与导出100%匹配）
+- ✅ 导出进度提示（显示 x/y）
+
+### 修复
+- 🐛 修复撤销/重做50条后异常问题
+- 🐛 修复图片可能被误删的问题
+- 🐛 修复渲染出错白屏问题
+- 🐛 修复导出字体可能不加载问题
+
+---
+
+## 🛠️ 技术栈
+
+| 技术 | 用途 |
+|-----|------|
+| HTML5 + CSS3 + JavaScript ES6+ | 基础技术 |
+| [marked](https://marked.js.org/) | Markdown 解析 |
+| [html2canvas](https://html2canvas.hertzen.com/) | 截图生成 |
+| [JSZip](https://stuk.github.io/jszip/) | ZIP 打包 |
+| [FileSaver.js](https://github.com/eligrey/FileSaver.js/) | 文件下载 |
+| [KaTeX](https://katex.org/) | 数学公式渲染 |
+| Google Fonts | 字体库 |
+| IndexedDB | 本地数据存储 |
+
+---
+
+## 📄 许可证
+
+MIT License
+
+---
+
+## 🎉 致谢
+
+感谢所有开源库的贡献者！
