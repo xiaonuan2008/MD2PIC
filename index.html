@@ -287,7 +287,7 @@
 
     <div class="header">
         <div class="header-left">
-            <h1>排版记事本 <span>V16 智能分页</span></h1>
+            <h1>排版记事本 <span>V17 智能分页</span></h1>
         </div>
         <div class="header-right">
             <button id="export-btn" class="export-btn" onclick="exportImages()">保存大图</button>
@@ -539,7 +539,7 @@
         let isHistoryTraversing = false;
 
         // 默认文本
-        const defaultText = `# 🎉 V16 智能分页版\n\n现在，分页算法已优化，再也不会丢失内容了！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的"设置工具（主题/字号等）"都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置\n- [x] 智能分页，内容不再丢失`;
+        const defaultText = `# 🎉 V17 智能分页版\n\n现在，分页算法已全面优化：\n- 智能标点断行（优先在。！？等标点处断页）\n- 标题保护（避免标题单独一页）\n- 更好的块级元素支持\n- 再也不会丢失内容了！\n\n---\n\n## 📱 手机端极限体验\n\n当您在手机上访问时：\n\n1. 点击下方【排版预览】。你会发现，所有的"设置工具（主题/字号等）"都在预览页的**顶部横向排列**。\n2. 您可以一边滑动手势调大字号，一边在下方看到卡片文字瞬间变大！**排版体验完全闭环。**\n\n>! 这就是专门为自媒体创作者打磨的顶级生产力工具，赶紧把您的长文粘进来试试吧！\n\n- [x] PC 桌面端分屏完美操作\n- [x] 手机端沉浸式所见即所得\n- [x] 所有样式随心横滑设置\n- [x] 智能分页，内容不再丢失`;
 
         marked.setOptions({ breaks: true, gfm: true });
         if (typeof markedKatex !== 'undefined') marked.use(markedKatex({ throwOnError: false }));
@@ -1045,13 +1045,157 @@
             let current = createNewPage(pageIndex);
             scaleWrapper.appendChild(current.page);
 
-            // ★ 修复：使用 cloneNode 克隆节点，避免操作原始 DOM 节点导致内容丢失
             let queue = [];
             hiddenStaging.childNodes.forEach(node => {
                 if (node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim() !== '')) {
                     queue.push(node.cloneNode(true));
                 }
             });
+
+            const blockTags = ['P', 'DIV', 'BLOCKQUOTE', 'UL', 'OL', 'TABLE', 'PRE'];
+            const headingTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+            const punctuation = '。，、；：？！,.!?;:';
+
+            function tryAddNode(node, nextNode) {
+                current.content.appendChild(node);
+
+                if (current.page.scrollHeight <= current.page.clientHeight) {
+                    return { success: true };
+                }
+
+                current.content.removeChild(node);
+
+                if (headingTags.includes(node.tagName) && current.content.childNodes.length > 0) {
+                    pageIndex++;
+                    current = createNewPage(pageIndex);
+                    scaleWrapper.appendChild(current.page);
+                    current.content.appendChild(node);
+                    return { success: true };
+                }
+
+                if (blockTags.includes(node.tagName)) {
+                    if (current.content.childNodes.length === 0) {
+                        current.content.appendChild(node);
+                        return { success: true };
+                    }
+                    pageIndex++;
+                    current = createNewPage(pageIndex);
+                    scaleWrapper.appendChild(current.page);
+                    current.content.appendChild(node);
+                    return { success: true };
+                }
+
+                if (node.tagName === 'P') {
+                    return splitParagraph(node);
+                }
+
+                if (current.content.childNodes.length === 0) {
+                    current.content.appendChild(node);
+                    return { success: true };
+                }
+                pageIndex++;
+                current = createNewPage(pageIndex);
+                scaleWrapper.appendChild(current.page);
+                current.content.appendChild(node);
+                return { success: true };
+            }
+
+            function splitParagraph(p) {
+                let p1 = document.createElement('p');
+                let p2 = document.createElement('p');
+                current.content.appendChild(p1);
+
+                let childQueue = Array.from(p.childNodes);
+                let overflowed = false;
+                let addedSomethingToP1 = false;
+
+                while (childQueue.length > 0) {
+                    let child = childQueue.shift();
+                    p1.appendChild(child);
+
+                    if (current.page.scrollHeight > current.page.clientHeight) {
+                        p1.removeChild(child);
+                        overflowed = true;
+
+                        if (child.nodeType === Node.TEXT_NODE) {
+                            let text = child.textContent;
+                            let low = 0, high = text.length, best = 0;
+                            let bestPunc = -1;
+
+                            for (let i = 0; i < Math.min(text.length, high); i++) {
+                                if (punctuation.includes(text[i])) {
+                                    bestPunc = i + 1;
+                                }
+                            }
+                            if (bestPunc > 0) {
+                                best = bestPunc;
+                            }
+
+                            while (low <= high) {
+                                let mid = Math.floor((low + high) / 2);
+                                let tempText = document.createTextNode(text.substring(0, mid));
+                                p1.appendChild(tempText);
+
+                                if (current.page.scrollHeight <= current.page.clientHeight) {
+                                    best = mid; low = mid + 1;
+                                } else {
+                                    high = mid - 1;
+                                }
+                                p1.removeChild(tempText);
+                            }
+
+                            if (best > 0) {
+                                p1.appendChild(document.createTextNode(text.substring(0, best)));
+                                addedSomethingToP1 = true;
+                            }
+                            let remainder = text.substring(best);
+                            if (remainder) p2.appendChild(document.createTextNode(remainder));
+                        } else {
+                            if (p1.childNodes.length === 0 && current.content.childNodes.length <= 1) {
+                                p1.appendChild(child);
+                                addedSomethingToP1 = true;
+                            } else {
+                                p2.appendChild(child);
+                            }
+                        }
+
+                        while (childQueue.length > 0) { p2.appendChild(childQueue.shift()); }
+                        break;
+                    } else {
+                        addedSomethingToP1 = true;
+                    }
+                }
+
+                if (overflowed) {
+                    if (!addedSomethingToP1) {
+                        current.content.removeChild(p1);
+                        if (current.content.childNodes.length === 0) {
+                            current.content.appendChild(p1);
+                            if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
+                                queue.unshift(p2);
+                            }
+                            pageIndex++;
+                            current = createNewPage(pageIndex);
+                            scaleWrapper.appendChild(current.page);
+                        } else {
+                            pageIndex++;
+                            current = createNewPage(pageIndex);
+                            scaleWrapper.appendChild(current.page);
+                            queue.unshift(p);
+                        }
+                    } else {
+                        pageIndex++;
+                        current = createNewPage(pageIndex);
+                        scaleWrapper.appendChild(current.page);
+                        if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
+                            queue.unshift(p2);
+                        }
+                    }
+                    return { success: true };
+                }
+
+                return { success: true };
+            }
 
             while (queue.length > 0) {
                 let node = queue.shift();
@@ -1063,112 +1207,11 @@
                         current = createNewPage(pageIndex);
                         scaleWrapper.appendChild(current.page);
                     }
-                    continue; 
+                    continue;
                 }
 
-                current.content.appendChild(node);
-
-                if (current.page.scrollHeight > current.page.clientHeight) {
-                    current.content.removeChild(node);
-
-                    if (current.content.childNodes.length === 0 && node.tagName !== 'P') {
-                        current.content.appendChild(node);
-                        if (queue.length > 0) {
-                            pageIndex++;
-                            current = createNewPage(pageIndex);
-                            scaleWrapper.appendChild(current.page);
-                        }
-                        continue;
-                    }
-
-                    if (node.tagName === 'P') {
-                        let p1 = document.createElement('p');
-                        let p2 = document.createElement('p');
-                        current.content.appendChild(p1);
-
-                        let childQueue = Array.from(node.childNodes);
-                        let overflowed = false;
-                        let addedSomethingToP1 = false;
-
-                        while (childQueue.length > 0) {
-                            let child = childQueue.shift();
-                            p1.appendChild(child);
-
-                            if (current.page.scrollHeight > current.page.clientHeight) {
-                                p1.removeChild(child);
-                                overflowed = true;
-
-                                if (child.nodeType === Node.TEXT_NODE) {
-                                    let text = child.textContent;
-                                    let low = 0, high = text.length, best = 0;
-                                    while (low <= high) {
-                                        let mid = Math.floor((low + high) / 2);
-                                        let tempText = document.createTextNode(text.substring(0, mid));
-                                        p1.appendChild(tempText);
-                                        
-                                        if (current.page.scrollHeight <= current.page.clientHeight) {
-                                            best = mid; low = mid + 1; 
-                                        } else {
-                                            high = mid - 1; 
-                                        }
-                                        p1.removeChild(tempText);
-                                    }
-                                    
-                                    if (best > 0) {
-                                        p1.appendChild(document.createTextNode(text.substring(0, best)));
-                                        addedSomethingToP1 = true;
-                                    }
-                                    let remainder = text.substring(best);
-                                    if (remainder) p2.appendChild(document.createTextNode(remainder));
-                                } else {
-                                    if (p1.childNodes.length === 0 && current.content.childNodes.length <= 1) {
-                                        p1.appendChild(child);
-                                        addedSomethingToP1 = true;
-                                    } else {
-                                        p2.appendChild(child);
-                                    }
-                                }
-
-                                while (childQueue.length > 0) { p2.appendChild(childQueue.shift()); }
-                                break;
-                            } else {
-                                addedSomethingToP1 = true;
-                            }
-                        }
-
-                        if (overflowed) {
-                            if (!addedSomethingToP1) {
-                                current.content.removeChild(p1);
-                                if (current.content.childNodes.length === 0) {
-                                    current.content.appendChild(p1);
-                                    if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
-                                        queue.unshift(p2);
-                                    }
-                                    pageIndex++;
-                                    current = createNewPage(pageIndex);
-                                    scaleWrapper.appendChild(current.page);
-                                } else {
-                                    pageIndex++;
-                                    current = createNewPage(pageIndex);
-                                    scaleWrapper.appendChild(current.page);
-                                    queue.unshift(node);
-                                }
-                            } else {
-                                pageIndex++;
-                                current = createNewPage(pageIndex);
-                                scaleWrapper.appendChild(current.page);
-                                if (p2.childNodes.length > 0 || p2.textContent.trim() !== '') {
-                                    queue.unshift(p2);
-                                }
-                            }
-                        }
-                    } else {
-                        pageIndex++;
-                        current = createNewPage(pageIndex);
-                        scaleWrapper.appendChild(current.page);
-                        queue.unshift(node);
-                    }
-                }
+                let nextNode = queue.length > 0 ? queue[0] : null;
+                tryAddNode(node, nextNode);
             }
 
             adjustScale();
