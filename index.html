@@ -13,6 +13,7 @@
     <!-- 引入基础库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -300,6 +301,21 @@
             .nav-item svg { width: 22px; height: 22px; margin-bottom: 2px; fill: currentColor; }
             .nav-item.active { color: #0ea5e9; font-weight: bold; background: #f0f9ff; }
         }
+
+        /* ============================================== */
+        /* ★ HTML 报告导入模式 ★ */
+        /* ============================================== */
+        .file-actions .mode-btn { background: #fff; color: #666; border: 1px solid #d1d1d6; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .file-actions .mode-btn.active { background: #0ea5e9; border-color: #0ea5e9; color: #fff; }
+        .file-actions .mode-btn:active { transform: scale(0.96); }
+
+        /* HTML 模式下隐藏 Markdown 工具栏 */
+        body.mode-html .md-toolbar { display: none; }
+
+        /* HTML 报告根容器：图片自适应页宽，防止超高图片撑破分页 */
+        .html-report-root img { max-width: 100% !important; height: auto !important; }
+        .html-report-root svg { max-width: 100%; }
+        .html-report-root [data-md2pic-img-failed] { border: 2px dashed #f87171; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -320,8 +336,12 @@
         <div class="editor-panel">
             <!-- 操作按钮 -->
             <div class="editor-header">
-                <span class="title">✏️ 纯净写作模式</span>
+                <span class="title" id="editor-mode-title">✏️ 纯净写作模式</span>
                 <div class="file-actions">
+                    <button id="mode-md" class="mode-btn active" onclick="switchMode('md')" title="Markdown 写作模式">✏️ MD</button>
+                    <button id="mode-html" class="mode-btn" onclick="switchMode('html')" title="HTML 报告导入模式">📄 HTML</button>
+                    <input type="file" id="html-upload" accept=".html,.htm,text/html" style="display: none;">
+                    <button id="btn-import-html" style="color:#7c3aed; display:none;" title="导入 .html 报告文件">📥 导入</button>
                     <input type="file" id="file-upload" accept="image/*" multiple style="display: none;">
                     <button id="btn-clear" style="color:#d32f2f;" title="清空内容">🗑️ 清空</button>
                     <button id="btn-restore" style="color:#007aff; display:none;" title="恢复">↩️ 恢复</button>
@@ -522,6 +542,9 @@
         // ==========================================
         const CONFIG_KEY = 'md_config';
         const DRAFT_KEY = 'md_draft';
+        const HTML_DRAFT_KEY = 'html_draft';
+        let currentMode = 'md'; // 'md' | 'html'
+        let lastMdCoverMode = true; // 切到 HTML 模式前记住 MD 的封面开关
 
         const themeSelect = document.getElementById('theme-select');
         const ratioSelect = document.getElementById('ratio-select');
@@ -544,6 +567,7 @@
         const saveHint = document.getElementById('save-hint');
         
         const fileUpload = document.getElementById('file-upload');
+        const htmlUpload = document.getElementById('html-upload');
         const btnClear = document.getElementById('btn-clear');
         const btnRestore = document.getElementById('btn-restore');
         const mainContainer = document.getElementById('main-container');
@@ -779,8 +803,74 @@
             mdInput.dispatchEvent(new Event('input'));
         }
 
+        // ==========================================
+        // HTML 报告模式：切换 / 导入 / 粘贴检测
+        // ==========================================
+        function applyModeUI() {
+            const isHtml = currentMode === 'html';
+            document.body.classList.toggle('mode-html', isHtml);
+            document.getElementById('mode-md').classList.toggle('active', !isHtml);
+            document.getElementById('mode-html').classList.toggle('active', isHtml);
+            document.getElementById('btn-import-html').style.display = isHtml ? 'inline-flex' : 'none';
+            document.getElementById('editor-mode-title').textContent = isHtml ? '📄 HTML 报告模式' : '✏️ 纯净写作模式';
+            mdInput.placeholder = isHtml
+                ? '粘贴 AI 生成的 HTML 报告源码，或点击右上角"导入"选择 .html 文件...'
+                : '开始您的创作... (排版样式设置已移至右侧预览区顶部)';
+            // HTML 报告通常自带封面样式，进入 HTML 模式时关闭内置封面页；切回 MD 时恢复用户原设置
+            if (isHtml) {
+                if (coverModeCheckbox.checked) lastMdCoverMode = true;
+                coverModeCheckbox.checked = false;
+            } else {
+                coverModeCheckbox.checked = lastMdCoverMode;
+            }
+        }
+
+        function looksLikeHtmlDocument(text) {
+            return /^\s*(<!DOCTYPE\s+html|<html[\s>])/i.test(text);
+        }
+
+        async function switchMode(mode) {
+            if (mode === currentMode) return;
+            await saveConfigAndDraft(); // 旧模式草稿落库
+            currentMode = mode;
+            applyModeUI();
+            const saved = await dbGet('data', mode === 'html' ? HTML_DRAFT_KEY : DRAFT_KEY);
+            mdInput.value = saved !== undefined ? saved : (mode === 'html' ? '' : defaultText);
+            saveHistory(mdInput.value);
+            triggerRender();
+            saveConfigAndDraft();
+        }
+
+        document.getElementById('html-upload').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                if (currentMode !== 'html') { currentMode = 'html'; applyModeUI(); }
+                mdInput.value = text;
+                htmlUpload.value = '';
+                saveHistory(mdInput.value);
+                triggerRender();
+                saveConfigAndDraft();
+                showToast(`✅ 已导入 ${file.name}，正在排版预览`);
+            } catch (err) {
+                alert('文件读取失败：' + err.message);
+            }
+            e.target.value = '';
+        });
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#10b981;color:white;padding:12px 20px;border-radius:8px;font-weight:bold;z-index:10000;animation:slideIn 0.3s ease;';
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease'; }, 2400);
+            setTimeout(() => toast.remove(), 2800);
+        }
+
         async function saveConfigAndDraft() {
             const config = {
+                mode: currentMode,
                 theme: themeSelect.value, watermark: watermarkInput.value,
                 ratio: ratioSelect.value, bgColor: bgColorInput.value,
                 coverMode: coverModeCheckbox.checked, font: fontSelect.value, 
@@ -788,22 +878,21 @@
                 textAlign: textAlignSelect.value
             };
             await dbSet('data', CONFIG_KEY, JSON.stringify(config));
-            await dbSet('data', DRAFT_KEY, mdInput.value);
+            await dbSet('data', currentMode === 'html' ? HTML_DRAFT_KEY : DRAFT_KEY, mdInput.value);
             cleanupUnusedImages(mdInput.value); 
             
             saveHint.style.opacity = '1'; setTimeout(() => { saveHint.style.opacity = '0'; }, 2000);
         }
 
         async function loadConfigAndDraft() {
-            const savedDraft = await dbGet('data', DRAFT_KEY);
-            mdInput.value = savedDraft !== undefined ? savedDraft : defaultText;
-            
             const configStr = await dbGet('data', CONFIG_KEY);
             if (configStr) {
                 const config = JSON.parse(configStr);
+                if (config.mode === 'html') currentMode = 'html';
+                applyModeUI();
                 if(config.theme) themeSelect.value = config.theme;
                 if(config.watermark) watermarkInput.value = config.watermark;
-                if(config.coverMode !== undefined) coverModeCheckbox.checked = config.coverMode;
+                if(config.coverMode !== undefined) lastMdCoverMode = config.coverMode;
                 if(config.ratio) {
                     ratioSelect.value = config.ratio;
                     const [w, h] = config.ratio.split('x');
@@ -818,6 +907,9 @@
                 if(config.lineHeight) { lineHeightRange.value = config.lineHeight; root.style.setProperty('--base-line-height', config.lineHeight); }
                 if(config.textAlign) { textAlignSelect.value = config.textAlign; root.style.setProperty('--text-align', config.textAlign); }
             }
+            const draftKey = currentMode === 'html' ? HTML_DRAFT_KEY : DRAFT_KEY;
+            const savedDraft = await dbGet('data', draftKey);
+            mdInput.value = savedDraft !== undefined ? savedDraft : (currentMode === 'html' ? '' : defaultText);
             saveHistory(mdInput.value); 
             triggerRender();
         }
@@ -942,6 +1034,22 @@
 
         mdInput.addEventListener('paste', async (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            // 粘贴完整 HTML 文档时自动切换到 HTML 报告模式
+            if (currentMode === 'md') {
+                const plain = e.clipboardData && e.clipboardData.getData('text/plain');
+                if (plain && looksLikeHtmlDocument(plain)) {
+                    e.preventDefault();
+                    if (currentMode !== 'html') await switchMode('html');
+                    const s = mdInput.selectionStart, t = mdInput.selectionEnd;
+                    mdInput.value = mdInput.value.substring(0, s) + plain + mdInput.value.substring(t);
+                    mdInput.selectionStart = mdInput.selectionEnd = s + plain.length;
+                    saveHistory(mdInput.value);
+                    triggerRender();
+                    saveConfigAndDraft();
+                    showToast('📄 已识别为 HTML 报告，自动切换模式');
+                    return;
+                }
+            }
             let hasImage = false;
             for (let index in items) {
                 const item = items[index];
@@ -979,52 +1087,211 @@
             if (isRendering) return;
             isRendering = true;
             try {
-                // 1. 基础 Markdown 解析
-                hiddenStaging.innerHTML = marked.parse(mdInput.value);
+                if (currentMode === 'html') {
+                    await renderHtmlContent();
+                } else {
+                    // 1. 基础 Markdown 解析
+                    hiddenStaging.innerHTML = marked.parse(mdInput.value);
 
-                // 2. 解析后处理网感组件
-                const blockquotes = hiddenStaging.querySelectorAll('blockquote');
-                blockquotes.forEach(bq => {
-                    const firstP = bq.querySelector('p');
-                    if (firstP) {
-                        let text = firstP.innerHTML;
-                        if (text.match(/^[!！]\s?/)) {
-                            bq.classList.add('notice-box');
-                            firstP.innerHTML = text.replace(/^[!！]\s?/, '');
+                    // 2. 解析后处理网感组件
+                    const blockquotes = hiddenStaging.querySelectorAll('blockquote');
+                    blockquotes.forEach(bq => {
+                        const firstP = bq.querySelector('p');
+                        if (firstP) {
+                            let text = firstP.innerHTML;
+                            if (text.match(/^[!！]\s?/)) {
+                                bq.classList.add('notice-box');
+                                firstP.innerHTML = text.replace(/^[!！]\s?/, '');
+                            }
                         }
-                    }
-                });
-
-                const uls = hiddenStaging.querySelectorAll('ul');
-                uls.forEach(ul => {
-                    if (ul.querySelector('input[type="checkbox"]')) {
-                        ul.classList.add('contains-task-list');
-                        const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
-                        checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
-                    }
-                });
-
-                // 3. 异步处理图片
-                const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
-                const loadPromises = imgs.map(img => {
-                    return new Promise(async (resolve) => {
-                        let src = img.getAttribute('src');
-                        if (src && src.startsWith('local_img_')) {
-                            const realBase64 = await dbGet('images', src);
-                            if (realBase64) img.src = realBase64;
-                            else img.alt = '⚠️ 图片已失效';
-                        }
-                        if (img.complete) resolve();
-                        else { img.onload = resolve; img.onerror = resolve; }
                     });
-                });
-                await Promise.all(loadPromises);
-                
+
+                    const uls = hiddenStaging.querySelectorAll('ul');
+                    uls.forEach(ul => {
+                        if (ul.querySelector('input[type="checkbox"]')) {
+                            ul.classList.add('contains-task-list');
+                            const checkboxes = ul.querySelectorAll('input[type="checkbox"]');
+                            checkboxes.forEach(cb => { cb.removeAttribute('disabled'); });
+                        }
+                    });
+
+                    // 3. 异步处理图片
+                    const imgs = Array.from(hiddenStaging.querySelectorAll('img'));
+                    const loadPromises = imgs.map(img => {
+                        return new Promise(async (resolve) => {
+                            let src = img.getAttribute('src');
+                            if (src && src.startsWith('local_img_')) {
+                                const realBase64 = await dbGet('images', src);
+                                if (realBase64) img.src = realBase64;
+                                else img.alt = '⚠️ 图片已失效';
+                            }
+                            if (img.complete) resolve();
+                            else { img.onload = resolve; img.onerror = resolve; }
+                        });
+                    });
+                    await Promise.all(loadPromises);
+                }
+
                 // 4. 执行智能分页
                 paginateNodes();
             } finally {
                 isRendering = false;
             }
+        }
+
+        // ==========================================
+        // HTML 报告模式：解析 / 清洗 / 资源内嵌 / 样式作用域化
+        // ==========================================
+        function fetchToDataUrl(url) {
+            return fetch(url, { mode: 'cors' })
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+                .then(blob => new Promise((resolve, reject) => {
+                    const fr = new FileReader();
+                    fr.onload = () => resolve(fr.result);
+                    fr.onerror = () => reject(new Error('read fail'));
+                    fr.readAsDataURL(blob);
+                }))
+                .catch(() => null);
+        }
+
+        const HTML_IMG_FALLBACK = 'data:image/svg+xml,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400"><rect width="100%" height="100%" fill="#fef2f2"/><text x="50%" y="50%" text-anchor="middle" fill="#b91c1c" font-size="26" font-family="sans-serif">⚠️ 图片加载失败（外链跨域受限，请下载后手动上传）</text></svg>'
+        );
+
+        async function inlineExternalImages(rootEl) {
+            const jobs = [];
+            rootEl.querySelectorAll('img').forEach(img => {
+                const src = img.getAttribute('src') || '';
+                if (!src || src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('local_img_')) return;
+                jobs.push(fetchToDataUrl(src).then(dataUrl => {
+                    if (dataUrl) img.setAttribute('src', dataUrl);
+                    else {
+                        img.setAttribute('src', HTML_IMG_FALLBACK);
+                        img.setAttribute('data-md2pic-img-failed', '1');
+                    }
+                }));
+            });
+            rootEl.querySelectorAll('svg image').forEach(node => {
+                const href = node.getAttribute('href') || node.getAttribute('xlink:href') || '';
+                if (!href || href.startsWith('data:')) return;
+                jobs.push(fetchToDataUrl(href).then(dataUrl => { if (dataUrl) node.setAttribute('href', dataUrl); }));
+            });
+            await Promise.all(jobs);
+        }
+
+        function waitImagesLoaded(rootEl) {
+            const imgs = Array.from(rootEl.querySelectorAll('img'));
+            return Promise.all(imgs.map(img => img.complete ? null : new Promise(res => { img.onload = res; img.onerror = res; })));
+        }
+
+        // CSS 作用域化：借浏览器原生规则树解析，给普通选择器统一加 .html-report-root 前缀
+        // （@media/@supports 递归处理，@keyframes/@font-face/@import 原样保留）
+        function scopeCss(cssText) {
+            const probe = document.createElement('style');
+            probe.textContent = cssText;
+            document.head.appendChild(probe);
+            let result = '';
+            try {
+                const walk = (rules) => {
+                    let out = '';
+                    for (const rule of rules) {
+                        const type = rule.type;
+                        if (type === 1) { // CSSRule.STYLE_RULE
+                            const sels = rule.selectorText.split(',')
+                                .map(s => '.html-report-root ' + s.trim())
+                                .join(', ');
+                            out += `${sels} { ${rule.style.cssText} }\n`;
+                        } else if (type === 4) { // CSSRule.MEDIA_RULE
+                            const cond = rule.conditionText || (rule.media && rule.media.mediaText) || 'all';
+                            out += `@media ${cond} { ${walk(rule.cssRules)} }\n`;
+                        } else if (type === 12) { // CSSRule.SUPPORTS_RULE
+                            out += `@supports ${rule.conditionText} { ${walk(rule.cssRules)} }\n`;
+                        } else {
+                            out += rule.cssText + '\n';
+                        }
+                    }
+                    return out;
+                };
+                result = walk(probe.sheet.cssRules);
+            } catch (err) {
+                console.warn('scopeCss 解析失败，退回原样注入', err);
+                result = cssText;
+            } finally {
+                probe.remove();
+            }
+            return result;
+        }
+
+        // 把 CSS 文本中的 url(http...) 外链转成 dataURL
+        async function inlineCssUrls(cssText) {
+            const urlRe = /url\(\s*(['"]?)(https?:\/\/[^)'"]+)\1\s*\)/g;
+            const matches = Array.from(cssText.matchAll(urlRe));
+            if (!matches.length) return cssText;
+            const uniq = Array.from(new Set(matches.map(m => m[2])));
+            const map = new Map();
+            await Promise.all(uniq.map(async u => map.set(u, await fetchToDataUrl(u))));
+            return cssText.replace(urlRe, (m, q, u) => (map.get(u) ? `url("${map.get(u)}")` : m));
+        }
+
+        async function injectReportStyles(styleTexts, linkHrefs) {
+            let merged = styleTexts.join('\n');
+            merged = await inlineCssUrls(merged);
+            for (const href of linkHrefs) {
+                const css = await fetch(href, { mode: 'cors' }).then(r => r.ok ? r.text() : null).catch(() => null);
+                if (css) merged += '\n' + await inlineCssUrls(css);
+                else if (!document.querySelector(`link[href="${CSS.escape(href)}"]`)) {
+                    const l = document.createElement('link');
+                    l.rel = 'stylesheet';
+                    l.href = href;
+                    document.head.appendChild(l);
+                }
+            }
+            const scoped = scopeCss(merged);
+            let styleEl = document.getElementById('md2pic-html-scoped');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'md2pic-html-scoped';
+                document.head.appendChild(styleEl);
+            }
+            styleEl.textContent = scoped;
+        }
+
+        async function renderHtmlContent() {
+            const raw = mdInput.value;
+            if (!raw.trim()) { hiddenStaging.innerHTML = ''; return; }
+
+            // 1. 解析完整 HTML 文档（AI 报告通常是带 <head> 的完整页面）
+            const doc = new DOMParser().parseFromString(raw, 'text/html');
+
+            // 2. 收集 head 中的样式资源（body 内联 <style> 也一并收集）
+            const styleTexts = [];
+            doc.querySelectorAll('style').forEach(s => styleTexts.push(s.textContent));
+            const linkHrefs = [];
+            doc.querySelectorAll('link[rel="stylesheet" i]').forEach(l => {
+                const href = l.getAttribute('href');
+                if (href) linkHrefs.push(href);
+            });
+
+            // 3. DOMPurify 清洗 body（剥离 script/iframe/form 等；inline style 保留）
+            const cleanBody = DOMPurify.sanitize(doc.body.innerHTML, {
+                FORBID_TAGS: ['script', 'iframe', 'form', 'input', 'button', 'textarea', 'select', 'option'],
+                FORBID_ATTR: ['srcdoc', 'formaction']
+            });
+
+            // 4. 渲染进隐藏容器（.html-report-root 是样式作用域根）
+            hiddenStaging.innerHTML = `<div class="html-report-root">${cleanBody}</div>`;
+
+            // 5. 外部图片/SVG 转 dataURL（失败给占位提示）
+            await inlineExternalImages(hiddenStaging);
+
+            // 6. 样式作用域化注入（含 CSS 内 url() 内嵌）
+            await injectReportStyles(styleTexts, linkHrefs);
+
+            // 7. 等待字体与图片就绪再分页，避免测量偏差
+            await Promise.all([
+                document.fonts ? document.fonts.ready : Promise.resolve(),
+                waitImagesLoaded(hiddenStaging)
+            ]);
         }
 
         function createNewPage(pageIndex) {
@@ -1096,12 +1363,23 @@
                 if (blockTags.includes(node.tagName)) {
                     if (current.content.childNodes.length === 0) {
                         current.content.appendChild(node);
+                        if (current.page.scrollHeight <= current.page.clientHeight) {
+                            return { success: true };
+                        }
+                        // 本页第一个元素就超过一页 → 拆分发（避免裁切丢内容）
+                        current.content.removeChild(node);
+                        flattenOversizedNode(node, 0);
                         return { success: true };
                     }
                     pageIndex++;
                     current = createNewPage(pageIndex);
                     scaleWrapper.appendChild(current.page);
                     current.content.appendChild(node);
+                    if (current.page.scrollHeight > current.page.clientHeight) {
+                        // 独占一整页仍放不下 → 拆分块内元素，而不是 overflow 裁切丢内容
+                        current.content.removeChild(node);
+                        flattenOversizedNode(node, 0);
+                    }
                     return { success: true };
                 }
 
@@ -1111,18 +1389,29 @@
 
                 if (current.content.childNodes.length === 0) {
                     current.content.appendChild(node);
+                    if (current.page.scrollHeight <= current.page.clientHeight) {
+                        return { success: true };
+                    }
+                    current.content.removeChild(node);
+                    flattenOversizedNode(node, 0);
                     return { success: true };
                 }
                 pageIndex++;
                 current = createNewPage(pageIndex);
                 scaleWrapper.appendChild(current.page);
                 current.content.appendChild(node);
+                if (current.page.scrollHeight > current.page.clientHeight) {
+                    current.content.removeChild(node);
+                    flattenOversizedNode(node, 0);
+                }
                 return { success: true };
             }
 
             function splitParagraph(p) {
-                let p1 = document.createElement('p');
-                let p2 = document.createElement('p');
+                // 用 cloneNode(false) 保留原节点的 class / inline style，
+                // 拆分后的两半都延续原样式（HTML 报告模式同样受益）
+                let p1 = p.cloneNode(false);
+                let p2 = p.cloneNode(false);
                 current.content.appendChild(p1);
 
                 let childQueue = Array.from(p.childNodes);
@@ -1215,6 +1504,147 @@
                 }
 
                 return { success: true };
+            }
+
+            // ==========================================
+            // 超长块级元素拆分引擎（HTML 报告模式专用）
+            // 目标：任何块放不下时优先拆分内部结构，绝不 overflow 裁切丢内容
+            // ==========================================
+            const FLATTEN_CONTAINER_TAGS = ['DIV','SECTION','ARTICLE','MAIN','ASIDE','FIGURE','BLOCKQUOTE','HEADER','FOOTER','NAV','CENTER','DETAILS','LABEL'];
+            const FLATTEN_LIST_TAGS = ['UL','OL','DL'];
+            const MAX_FLATTEN_DEPTH = 5;
+
+            function flattenOversizedNode(node, depth) {
+                if (depth > MAX_FLATTEN_DEPTH) {
+                    console.warn('[MD2PIC] 内容块递归拆分达到上限，整体置入（可能溢出）', node);
+                    current.content.appendChild(node);
+                    return;
+                }
+                if (node.nodeType === 3) {
+                    if (node.textContent.trim() === '') return;
+                    const wrapper = document.createElement('p');
+                    wrapper.style.margin = '0 0 16px';
+                    wrapper.appendChild(node);
+                    flattenOversizedNode(wrapper, depth + 1);
+                    return;
+                }
+                if (node.nodeType !== 1) return;
+                const tag = node.tagName.toUpperCase();
+
+                if (FLATTEN_CONTAINER_TAGS.includes(tag)) {
+                    const children = Array.from(node.childNodes)
+                        .filter(n => n.nodeType !== 3 || n.textContent.trim() !== '');
+                    if (children.length > 1) {
+                        for (let i = children.length - 1; i >= 0; i--) queue.unshift(children[i]);
+                        return;
+                    }
+                    if (children.length === 1) { flattenOversizedNode(children[0], depth + 1); return; }
+                    current.content.appendChild(node);
+                    return;
+                }
+
+                if (FLATTEN_LIST_TAGS.includes(tag)) {
+                    const items = Array.from(node.children)
+                        .filter(el => ['LI','DT','DD'].includes(el.tagName));
+                    if (items.length > 1) {
+                        for (let i = items.length - 1; i >= 0; i--) queue.unshift(items[i]);
+                        return;
+                    }
+                    if (items.length === 1) { flattenOversizedNode(items[0], depth + 1); return; }
+                    current.content.appendChild(node);
+                    return;
+                }
+
+                if (tag === 'TABLE') { splitOversizedTable(node); return; }
+                if (tag === 'PRE') { splitOversizedPre(node); return; }
+                if (tag === 'IMG' || tag === 'SVG' || tag === 'CANVAS' || tag === 'VIDEO') {
+                    current.content.appendChild(node); // 单媒体元素无法拆分，CSS 限高兜底
+                    return;
+                }
+
+                // 其余标签（P/H* / 混排 inline 等）→ 文本级二分拆分
+                splitParagraph(node);
+            }
+
+            // 长表格：按行拆表，后续页重复表头
+            function splitOversizedTable(table) {
+                const thead = table.querySelector('thead');
+                const colgroup = table.querySelector('colgroup');
+                const allRows = Array.from(table.querySelectorAll('tr'))
+                    .filter(tr => !(thead && thead.contains(tr)));
+                if (allRows.length === 0) { current.content.appendChild(table); return; }
+
+                const buildTable = (rowSubset) => {
+                    const t = table.cloneNode(false);
+                    if (colgroup) t.appendChild(colgroup.cloneNode(true));
+                    if (thead) t.appendChild(thead.cloneNode(true));
+                    const tb = document.createElement('tbody');
+                    rowSubset.forEach(r => tb.appendChild(r));
+                    t.appendChild(tb);
+                    return t;
+                };
+                const fits = (t) => {
+                    current.content.appendChild(t);
+                    const ok = current.page.scrollHeight <= current.page.clientHeight;
+                    current.content.removeChild(t);
+                    return ok;
+                };
+
+                let idx = 0;
+                while (idx < allRows.length) {
+                    let best = 1;
+                    if (fits(buildTable(allRows.slice(idx, idx + 1)))) {
+                        let low = 2, high = allRows.length - idx;
+                        while (low <= high) {
+                            const mid = Math.floor((low + high) / 2);
+                            if (fits(buildTable(allRows.slice(idx, idx + mid)))) { best = mid; low = mid + 1; }
+                            else high = mid - 1;
+                        }
+                    } else {
+                        console.warn('[MD2PIC] 表格单行过高，整体置入（可能溢出）');
+                    }
+                    current.content.appendChild(buildTable(allRows.slice(idx, idx + best)));
+                    idx += best;
+                    if (idx < allRows.length) {
+                        pageIndex++;
+                        current = createNewPage(pageIndex);
+                        scaleWrapper.appendChild(current.page);
+                    }
+                }
+            }
+
+            // 长代码块：按行拆分，保留 pre 的 class / inline 样式
+            function splitOversizedPre(pre) {
+                const text = pre.textContent;
+                if (!text.includes('\n')) { splitParagraph(pre); return; }
+                const lines = text.split('\n');
+                const buildSeg = (from, to) => {
+                    const seg = pre.cloneNode(false);
+                    seg.textContent = lines.slice(from, to).join('\n');
+                    return seg;
+                };
+                const fits = (seg) => {
+                    current.content.appendChild(seg);
+                    const ok = current.page.scrollHeight <= current.page.clientHeight;
+                    current.content.removeChild(seg);
+                    return ok;
+                };
+                let idx = 0;
+                while (idx < lines.length) {
+                    let low = 1, high = lines.length - idx, best = 1;
+                    while (low <= high) {
+                        const mid = Math.floor((low + high) / 2);
+                        if (fits(buildSeg(idx, idx + mid))) { best = mid; low = mid + 1; }
+                        else high = mid - 1;
+                    }
+                    current.content.appendChild(buildSeg(idx, idx + best));
+                    idx += best;
+                    if (idx < lines.length) {
+                        pageIndex++;
+                        current = createNewPage(pageIndex);
+                        scaleWrapper.appendChild(current.page);
+                    }
+                }
             }
 
             while (queue.length > 0) {
